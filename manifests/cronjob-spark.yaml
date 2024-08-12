@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: spark-cronjob
+spec:
+  schedule: "0 * * * *"
+  suspend: true
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          containers:
+            - name: spark-job-container
+              image: spark-job-image:latest
+              imagePullPolicy: Never
+          restartPolicy: Never

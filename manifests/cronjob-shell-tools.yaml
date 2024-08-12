@@ -1,0 +1,17 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: shell-tools-cronjob
+spec:
+  schedule: "0 * * * *"
+  suspend: true
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          containers:
+            - name: shell-tools-container
+              image: shell-tools:latest
+              imagePullPolicy: Never
+          restartPolicy: Never

@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mongodb
+  namespace: argocd
+spec:
+  destination:
+    namespace: default
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    helm:
+      parameters:
+        - name: usePassword
+          value: "false"
+    path: stable/mongodb
+    repoURL: https://github.com/AnnaMajoLlanas/charts
+    targetRevision: HEAD
+  syncPolicy:
+    automated: {}
