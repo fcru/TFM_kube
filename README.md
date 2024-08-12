@@ -30,7 +30,7 @@ kubectl apply -f manifests/ingress-yarn.yaml
 
 # Install Mongodb
 ```
-kubectl apply -f manifest/install-mongodb.yaml
+kubectl apply -f manifests/install-mongodb.yaml
 ```
 
 ### Create database
@@ -51,7 +51,7 @@ db.uuids.find().pretty()
 
 # Install Kafka
 ```
-kubectl apply -f manifest/install-kafka.yaml
+kubectl apply -f manifests/install-kafka.yaml
 ```
 
 ## Configuration Files
@@ -88,7 +88,7 @@ kafka-console-consumer --consumer.config client.properties --bootstrap-server ka
 
 # Install Neo4j
 ```
-kubectl apply -f manifest/install-neo4j.yaml
+kubectl apply -f manifests/install-neo4j.yaml
 ```
 
 ### Connect to neo4J
