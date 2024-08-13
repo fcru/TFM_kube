@@ -1,0 +1,3 @@
+pyspark
+pymongo
+pymongo[srv]
