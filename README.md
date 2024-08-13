@@ -20,6 +20,7 @@ kubectl exec -it <pod-name> -- /bin/bash
 kubectl create namespace argocd
 kubectl apply -n argocd -f manifests/install-argocd.yaml
 ```
+Visit argocd UI at: localhost/argo-cd
 
 # Install Hadoop
 ```
@@ -27,6 +28,7 @@ kubectl apply -f manifests/install-hadoop.yaml
 kubectl apply -f manifests/ingress-hdfs.yaml
 kubectl apply -f manifests/ingress-yarn.yaml
 ```
+After tunnel activation HDFS UI and yarn UI could be visited respectively to hdfs.lvh.me and yarn.lvh.me
 
 # Install Mongodb
 ```
@@ -34,6 +36,8 @@ kubectl apply -f manifests/install-mongodb.yaml
 ```
 
 ### Create database
+
+In the cronjob-shell-tools shell: 
 
 Connect to mongodb with `mongosh mongodb://mongodb:27017`
 
