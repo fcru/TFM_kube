@@ -26,5 +26,27 @@ RUN apt install apt-transport-https && \
     apt update && \
     apt install -y neo4j
 
+# HDFS
+
+RUN apt-get update && \
+    apt-get install -y openjdk-8-jdk
+
+ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+
+ENV HADOOP_VERSION 3.3.2
+ENV HADOOP_HOME=/opt/hadoop
+
+ENV HADOOP_COMMON_HOME=${HADOOP_HOME} \
+    HADOOP_HDFS_HOME=${HADOOP_HOME} \
+    HADOOP_MAPRED_HOME=${HADOOP_HOME} \
+    HADOOP_YARN_HOME=${HADOOP_HOME} \
+    HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop \
+    PATH=${PATH}:${HADOOP_HOME}/bin
+
+RUN wget https://archive.apache.org/dist/hadoop/common/hadoop-3.3.2/hadoop-3.3.2.tar.gz && \
+    tar -xzf hadoop-${HADOOP_VERSION}.tar.gz && \
+    mv hadoop-${HADOOP_VERSION} ${HADOOP_HOME} && \
+    rm hadoop-${HADOOP_VERSION}.tar.gz
+
 # Set the entrypoint to an indefinite wait command
 ENTRYPOINT ["sleep", "infinity"]
