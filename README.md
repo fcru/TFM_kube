@@ -30,6 +30,14 @@ kubectl apply -f manifests/ingress-yarn.yaml
 ```
 After tunnel activation HDFS UI and yarn UI could be visited respectively to hdfs.lvh.me and yarn.lvh.me
 
+## Create directory
+
+In the cronjob-shell-tools shell: 
+
+hdfs dfs -mkdir -p hdfs://hadooop-hadoop-hdfs-nn:9000/test/set
+hdfs dfs -ls hdfs://hadooop-hadoop-hdfs-nn:9000/test/
+
+
 # Install Mongodb
 ```
 kubectl apply -f manifests/install-mongodb.yaml
