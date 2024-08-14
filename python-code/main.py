@@ -2,9 +2,9 @@ from pymongo import MongoClient
 import uuid
 
 def main():
-
+    print("executing script")
     mongo_client = MongoClient("mongodb://mongodb:27017")
-
+    print("connection done!")
     # Access the database
     database = mongo_client["testdb"]
 
@@ -16,7 +16,7 @@ def main():
     print(uuid_documents)
     # Insert UUIDs into MongoDB collection
     collection.insert_many(uuid_documents)
-
+    print("insertion completed")
     # Close the MongoDB connection
     mongo_client.close()
 

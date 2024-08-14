@@ -26,7 +26,7 @@ public class SparkStreamingJob {
             writer.write("KafkaClient {\n");
             writer.write("  org.apache.kafka.common.security.plain.PlainLoginModule required\n");
             writer.write("  username=\"user1\"\n");
-            writer.write("  password=\"DmVPfYcZYc\";\n");
+            writer.write("  password=\"11tC2mApeB\";\n");
             writer.write("};\n");
         }
 

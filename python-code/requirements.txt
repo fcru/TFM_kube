@@ -1,3 +1,2 @@
 pyspark
 pymongo
-pymongo[srv]
