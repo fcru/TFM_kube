@@ -9,5 +9,5 @@ WORKDIR /opt
 
 # Set the entrypoint to run specific test:
 # ENTRYPOINT ["/opt/spark/bin/spark-submit", "--class", "com.example.spark.SparkJob", "/opt/spark-job.jar"]
-ENTRYPOINT ["/opt/spark/bin/spark-submit", "--class", "com.example.spark.SparkStreamingJob", "/opt/spark-job.jar"]
-# ENTRYPOINT ["java", "-cp", "/opt/spark-job.jar", "com.example.mongodb.MongoDBJob"]
+# ENTRYPOINT ["/opt/spark/bin/spark-submit", "--class", "com.example.spark.SparkStreamingJob", "/opt/spark-job.jar"]
+ENTRYPOINT ["java", "-cp", "/opt/spark-job.jar", "com.example.mongodb.MongoDBJob"]

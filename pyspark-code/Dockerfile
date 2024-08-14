@@ -15,4 +15,4 @@ WORKDIR /opt
 # Set the entrypoint to run specific test:
 
 #ENTRYPOINT ["/opt/spark/bin/spark-submit", "/opt/spark-job.py"]
-ENTRYPOINT ["/opt/spark/bin/spark-submit", "/opt/mongo-job.py"]
+ENTRYPOINT ["python3", "/opt/mongo-job.py"]
