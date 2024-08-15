@@ -115,3 +115,24 @@ cypher-shell -a neo4j://neo4j-neo4j:7687
 ./cicd.sh
 kubectl apply -f manifests/cronjob-spark.yaml
 ```
+
+# Execute Spark Job en python
+
+Uncomment in the file pyspark-code/Dockerfile the lines: 
+COPY ./src/main/example/spark-job.py /opt/spark-job.py
+ENTRYPOINT ["/opt/spark/bin/spark-submit", "/opt/spark-job.py"]
+
+Commenting the ones referred to MongoDB
+#COPY ./src/main/example/mongo-job.py /opt/mongo-job.py
+#ENTRYPOINT ["python3", "/opt/mongo-job.py"]
+
+Then execute **from the pyspark folder**: 
+
+````
+./build-pyspark.sh
+cd ..
+kubectl apply -f manifests/cronjob-pyspark-code.yaml
+````
+
+To execute the MongoDB job you only should comment the spark lines and uncomment the MongoDB ones. 
+Then execute the same command lines.
