@@ -1,6 +1,6 @@
-from pyspark import SparkConf, SparkContext
+from pyspark.sql import SparkConf, SparkContext
 from datetime import datetime
-import uuid
+
 
 
 def get_time_partition(timestamp):
