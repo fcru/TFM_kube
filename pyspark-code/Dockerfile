@@ -22,4 +22,6 @@ WORKDIR /opt
 
 #ENTRYPOINT ["/opt/spark/bin/spark-submit", "/opt/spark-job.py"]
 #ENTRYPOINT ["python3", "/opt/mongo-job.py"]
-ENTRYPOINT ["python3", "/opt/landing-zone/batch/batch_scrape.py"]
+#ENTRYPOINT ["python3", "/opt/landing-zone/batch/batch_scrape_bicing.py"]
+
+ENTRYPOINT ["sleep", "infinity"]
