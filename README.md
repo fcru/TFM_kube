@@ -136,3 +136,18 @@ kubectl apply -f manifests/cronjob-pyspark-code.yaml
 
 To execute the MongoDB job you only should comment the spark lines and uncomment the MongoDB ones. 
 Then execute the same command lines.
+
+Currently the uncommented lines run the batch-scraper to save files in hdfs from bicing API. 
+The default url is "https://opendata-ajuntament.barcelona.cat/data/es/dataset/informacio-estacions-bicing"
+At the moment to change to the estat estacio bicing we have to do it manually. 
+
+# Executing job using Batch_main.py
+
+The batch_main.py script allow to execute all the script with a build, choosing the selected one via terminal. 
+To do that, execute the build of build-pyspark.sh with the current setup
+Once in k9s enter in the shell of the cronjob and then execute 
+
+````
+python3 landing-zone/batch/batch_main.py
+```
+
