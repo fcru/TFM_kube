@@ -13,6 +13,7 @@ minikube tunnel
 # Interactive shell for a Running pod
 ```
 kubectl exec -it <pod-name> -- /bin/bash
+kubectl exec -it shell-tools-cronjob-manual-s8w-q96dv -- /bin/bash
 ```
 
 # Install argocd
@@ -60,6 +61,12 @@ show collections
 ```
 db.uuids.find().pretty()
 ```
+or delete all documents in a collection:
+
+```
+use testdb
+db.uuids.deleteMany({})
+```
 
 # Install Kafka
 ```
@@ -67,12 +74,18 @@ kubectl apply -f manifests/install-kafka.yaml
 ```
 
 ## Configuration Files
+
+In the cronjob-shell-tools shell:
+
 #### client.properties
 ```
 security.protocol=SASL_PLAINTEXT
 sasl.mechanism=PLAIN
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="user1" password="XXXXX";
 ```
+Jaas.conf is no longer necessary to create as it has been created within the project and is saved via the dockerfile.
+
+To change the password, modify the file kafka_client_jaas.conf.
 
 #### jaas.conf
 ```
@@ -84,6 +97,7 @@ KafkaClient {
 ```
 
 ## Create a topic
+In the cronjob-shell-tools shell:
 ```
 KAFKA_OPTS="-Djava.security.auth.login.config=jaas.conf" kafka-topics --create --topic my-topic --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --command-config client.properties
 ```
@@ -116,27 +130,24 @@ cypher-shell -a neo4j://neo4j-neo4j:7687
 kubectl apply -f manifests/cronjob-spark.yaml
 ```
 
-# Execute Spark Job en python
+# Execute pyspark-code jobs
 
-Uncomment in the file pyspark-code/Dockerfile the lines: 
-COPY ./src/main/example/spark-job.py /opt/spark-job.py
-ENTRYPOINT ["/opt/spark/bin/spark-submit", "/opt/spark-job.py"]
+In the dockerfile you only need to comment and uncomment the ENTRYPOINT.
 
-Commenting the ones referred to MongoDB
-#COPY ./src/main/example/mongo-job.py /opt/mongo-job.py
-#ENTRYPOINT ["python3", "/opt/mongo-job.py"]
+It is not necessary to comment the COPY code, they can all be uncommented.
+
 
 Then execute **from the pyspark folder**: 
 
 ````
 ./build-pyspark.sh
-cd ..
-kubectl apply -f manifests/cronjob-pyspark-code.yaml
 ````
 
-To execute the MongoDB job you only should comment the spark lines and uncomment the MongoDB ones. 
-Then execute the same command lines.
+## Streaming-job
+Subscribes to the topic *my-topic* and connects to mongodb, to the current test collection to save the key and the value that it receives
 
+
+## Batch_scrape_bicing job
 Currently the uncommented lines run the batch-scraper to save files in hdfs from bicing API. 
 The default url is "https://opendata-ajuntament.barcelona.cat/data/es/dataset/informacio-estacions-bicing"
 At the moment to change to the estat estacio bicing we have to do it manually. 
@@ -144,7 +155,8 @@ At the moment to change to the estat estacio bicing we have to do it manually.
 # Executing job using Batch_main.py
 
 The batch_main.py script allow to execute all the script with a build, choosing the selected one via terminal. 
-To do that, execute the build of build-pyspark.sh with the current setup
+To do that, execute the build of build-pyspark.sh with the current setup.
+
 Once in k9s enter in the shell of the cronjob and then execute 
 
 ````
