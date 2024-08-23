@@ -28,7 +28,7 @@ def scrape_website(URL) :
 def call_get_API(url, host='opendata-ajuntament.barcelona.cat', TOKEN='', params={}):
     session = requests.session()
     headers = {
-        "Authorization": TOKEN,
+        "X-Api-Key": TOKEN,
         "Host": host
     }
     try:

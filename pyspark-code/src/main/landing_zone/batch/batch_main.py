@@ -9,8 +9,8 @@ import sys
 def show_options(new):
     print("Choose the option you want to execute:")
     print("\t 0 - Exit")
-    print("\t 1 - Batch download Información Etación files")
-    print("\t 2 - Batch download Estado Etación files")
+    print("\t 1 - Batch download Información Estación files")
+    print("\t 2 - Batch download Estado Estación files")
     print("\t 3 - Batch download TMB data(bus and metro lines, bus stops and metro stations  ")
     print("\t 4 - to do 4")
 
@@ -24,7 +24,7 @@ while op != 0:
         type_api="informacio"
         batch_bicing_download(url, type_api)
     elif op == 2:
-        URL = "https://opendata-ajuntament.barcelona.cat/data/es/dataset/estat-estacions-bicing"
+        url = "https://opendata-ajuntament.barcelona.cat/data/es/dataset/estat-estacions-bicing"
         type_api = "estat_estacio"
         batch_bicing_download(url, type_api)
     elif op == 3:
@@ -39,10 +39,8 @@ while op != 0:
 
         url = "https://api.tmb.cat/v1/transit/parades"
         download_TMB_data(url, 'bus_stops')
-
-
     elif op == 4:
-        print("to do")
+        url = 'https://api.meteo.cat/xema/v1/variables/estadistics/diaris/1003' 
 
     else:
         print ("Exiting ...")
