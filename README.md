@@ -132,7 +132,7 @@ kubectl apply -f manifests/cronjob-spark.yaml
 
 # Execute pyspark-code jobs
 
-In the dockerfile you only need to comment and uncomment the ENTRYPOINT.
+In the pyspark-code/Dockerfile you only need to comment and uncomment the ENTRYPOINT.
 
 It is not necessary to comment the COPY code, they can all be uncommented.
 
@@ -141,6 +141,8 @@ Then execute **from the pyspark folder**:
 
 ````
 ./build-pyspark.sh
+cd ..
+kubectl apply -f manifests/cronjob-pyspark-code.yaml
 ````
 
 ## Streaming-job
