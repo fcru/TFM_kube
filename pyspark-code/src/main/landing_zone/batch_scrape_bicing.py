@@ -22,7 +22,7 @@ def batch_bicing_download(url, type_api):
             result = extract_csv_from_7z("temp.7z",spark,type_api)
             if result:
                 path, file_name, hdfs_path = result
-                save_hdfs_batch(spark, path, file_name, hdfs_path)
+                save_csv_hdfs(spark, path, file_name, hdfs_path)
                 cleanup_tmp_folder()
 
     spark.stop()

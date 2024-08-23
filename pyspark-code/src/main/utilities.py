@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 import py7zr
 from datetime import datetime
 import os
-from geojson import FeatureCollection
 
 
 load_dotenv()
@@ -25,12 +24,13 @@ def scrape_website(URL) :
     return data
 
 
-def call_get_API(url, host='opendata-ajuntament.barcelona.cat', TOKEN='', params={}):
+def call_get_API(url, host='opendata-ajuntament.barcelona.cat', TOKEN='', params={}, headers={}):
     session = requests.session()
-    headers = {
-        "X-Api-Key": TOKEN,
-        "Host": host
-    }
+    if TOKEN != '':
+        headers = {
+            "Authorization": TOKEN,
+            "Host": host
+        }
     try:
         response = session.get(url, headers=headers, params = params)
         response.raise_for_status()  # Raises an HTTPError for bad responses (4xx or 5xx)
@@ -47,30 +47,21 @@ def call_get_API(url, host='opendata-ajuntament.barcelona.cat', TOKEN='', params
         # If we reach here, an exception occurred
     return None
 
-def save_json_hdfs(spark,response,file_name):
+def save_json_hdfs(spark,response,file_name, context):
     data = response.json()
     json_str = json.dumps(data)
     rdd = spark.sparkContext.parallelize([json_str])
     df = spark.read.json(rdd)
-    hdfs_path=f"hdfs://hadooop-hadoop-hdfs-nn:9000/landing-zone/batch/TMB/{file_name}"
-    df.write.mode("overwrite").json(hdfs_path)
+    hdfs_path=f"hdfs://hadooop-hadoop-hdfs-nn:9000/landing-zone/batch/{context}/{file_name}"
+    df.write.mode("overwrite").parquet(hdfs_path)
     print(f"JSON file successfully written to {hdfs_path}")
 
-def from_hdfs_to_Geojson(spark,data):
-    df = spark.read.json(data)
-    geojson_data = df.toJSON().collect()
-    # Create a list of features
-    features = [json.loads(item) for item in geojson_data]
-    # Assuming the original structure was a FeatureCollection
-    geojson_feature_collection = FeatureCollection(features)
-    # Print or use the GeoJSON data as needed
-    print(json.dumps(geojson_feature_collection, indent=2))
 
 def save_7z(response):
     with open('temp.7z', 'wb') as f:
         f.write(response.content)
 
-def save_hdfs_batch(spark, path, file_name, hdfs_path):
+def save_csv_hdfs(spark, path, file_name, hdfs_path):
     df = spark.read.csv(path, header=True, inferSchema=True)
     df.write.mode('overwrite').parquet(hdfs_path)
     print(f"File {file_name} saved in parquet")
@@ -106,6 +97,25 @@ def cleanup_tmp_folder():
         except Exception as e:
             print(f'Failed to delete {file_path}. Reason: {e}')
     print("Tmp folder cleaned up")
+
+
+def list_files_by_condition (hdfs_path, fs, Path, condition='format'):
+    file_status = fs.listStatus(Path(hdfs_path))
+    files = []
+    for status in file_status:
+            path_dir = status.getPath().toString()
+            if condition == 'format':
+                if path_dir.endswith(".csv") or path_dir.endswith(".json"):
+                  files.append(status.getPath().toString())
+                else:
+                  files.extend(list_files_by_condition(path_dir,fs,Path, condition))
+            if condition == 'partition':
+                if 'month=' in path_dir:
+                  files.append(status.getPath().toString())
+                else:
+                  files.extend(list_files_by_condition(path_dir,fs,Path, condition))
+    return files
+
 
 
 

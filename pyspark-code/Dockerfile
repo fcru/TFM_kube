@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 #COPY ./src/main/example/streaming-job.py /opt/streaming-job.py
 
 #Batch Scrape Ajuntament
-COPY ./src/main/landing_zone/ /opt/landing-zone/
+COPY ./src/main/ /opt/
 
 # Set the working directory
 WORKDIR /opt
