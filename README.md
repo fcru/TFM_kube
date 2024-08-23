@@ -34,10 +34,10 @@ After tunnel activation HDFS UI and yarn UI could be visited respectively to hdf
 ## Create directory
 
 In the cronjob-shell-tools shell: 
-
+```
 hdfs dfs -mkdir -p hdfs://hadooop-hadoop-hdfs-nn:9000/test/set
 hdfs dfs -ls hdfs://hadooop-hadoop-hdfs-nn:9000/test/
-
+```
 
 # Install Mongodb
 ```
@@ -160,6 +160,6 @@ To do that, execute the build of build-pyspark.sh with the current setup.
 Once in k9s enter in the shell of the cronjob and then execute 
 
 ````
-python3 landing-zone/batch/batch_main.py
+python3 landing_zone/batch/batch_main.py
 ```
 
