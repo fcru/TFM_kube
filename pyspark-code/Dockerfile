@@ -16,7 +16,7 @@ COPY ./src/main/example/mongo-job.py /opt/mongo-job.py
 COPY ./src/main/example/streaming-job.py /opt/streaming-job.py
 
 #Batch Scrape Ajuntament
-COPY ./src/main/landing_zone/ /opt/landing-zone/
+COPY ./src/main/ /opt/
 
 # Set the working directory
 WORKDIR /opt
@@ -29,7 +29,7 @@ ENV JAVA_TOOL_OPTIONS="-Djava.security.auth.login.config=/etc/kafka_client_jaas.
 #ENTRYPOINT ["/opt/spark/bin/spark-submit", "/opt/spark-job.py"]
 #ENTRYPOINT ["python3", "/opt/mongo-job.py"]
 #ENTRYPOINT ["python3", "/opt/landing-zone/batch/batch_scrape_bicing.py"]
-ENTRYPOINT ["/opt/spark/bin/spark-submit", "--packages", \
-            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.mongodb.spark:mongo-spark-connector_2.12:10.1.1", \
-            "/opt/streaming-job.py"]
-#ENTRYPOINT ["sleep", "infinity"]
+#ENTRYPOINT ["/opt/spark/bin/spark-submit", "--packages", \
+            #"org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.mongodb.spark:mongo-spark-connector_2.12:10.1.1", \
+            #"/opt/streaming-job.py"]
+ENTRYPOINT ["sleep", "infinity"]
