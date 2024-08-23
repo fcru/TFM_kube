@@ -13,7 +13,6 @@ WORKDIR /opt
 
 COPY kafka-clients-3.5.1.jar /opt/spark/jars/kafka-clients-3.5.1.jar
 COPY kafka_client_jaas.conf /etc/kafka_client_jaas.conf
-ENV JAVA_TOOL_OPTIONS="-Djava.security.auth.login.config=/etc/kafka_client_jaas.conf"
 
 # Set the entrypoint to run specific test:
 ENTRYPOINT ["python3", "/opt/data_ingestion.py"]

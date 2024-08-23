@@ -2,26 +2,12 @@ from kafka import KafkaProducer
 import urllib.request
 import time
 import logging
+import json
+import os
 
 # Configurar el logging
 logging.basicConfig(level=logging.INFO)
-'''
-# Configuración del Kafka Producer
-producer = KafkaProducer(
-    bootstrap_servers='kafka:9092',
-    value_serializer=lambda v: str(v).encode('utf-8')
-)
 
-
-def send_to_kafka(topic, data):
-    """Envia los datos al tópico de Kafka"""
-    try:
-        producer.send(topic, value=data)
-        producer.flush()
-        logging.info(f"Datos enviados a Kafka: {data[:50]}...")  # Log solo los primeros 50 caracteres
-    except Exception as e:
-        logging.error(f"Error al enviar datos a Kafka: {e}")
-'''
 def fetch_data():
     """Descarga los datos desde la API"""
     try:
@@ -38,14 +24,38 @@ def fetch_data():
 # Bucle principal para descargar datos y enviarlos a Kafka
 kafka_topic = "estat_estacions"
 
+# Establecer la ruta al archivo jaas.conf
+jaas_file_path = '/etc/kafka_client_jaas.conf'  # Reemplaza con la ruta real de tu archivo jaas.conf
+# Establecer la propiedad de configuración del sistema para el archivo jaas.conf
+os.environ['KAFKA_OPTS'] = f'-Djava.security.auth.login.config={jaas_file_path}'
+
 for i in range(6):
+    # Configurar el Kafka Producer con SASL/PLAIN
+    producer = KafkaProducer(
+        bootstrap_servers='kafka:9092',  # Cambia 'localhost:9092' por la dirección de tu servidor Kafka
+        security_protocol='SASL_PLAINTEXT',  # Protocolo de seguridad
+        sasl_mechanism='PLAIN',              # Mecanismo de SASL
+        sasl_plain_username='user1',         # Usuario SASL (mismo que en jaas.conf)
+        sasl_plain_password='ai4mWf9kdA',    # Contraseña SASL (mismo que en jaas.conf)
+        key_serializer=lambda k: str(k).encode('utf-8'),  # Serializar la clave como string UTF-8
+        value_serializer=lambda v: json.dumps(v).encode('utf-8')  # Serializar el valor como JSON UTF-8
+    )
+
     data = fetch_data()
     if data:
-        #send_to_kafka(kafka_topic, data)
-        # Muestra los datos por pantalla
-        logging.info(f"Datos descargados: {data[:500]}...")  # Mostrar los primeros 500 caracteres
-        logging.info(f"Datos descargados y mostrados por pantalla.")  # Log de confirmación
 
+        json_obj = json.loads(data)
+        stations = json_obj["data"]["stations"]
 
+        for station in stations:
+            # Acceder a los campos de cada estación
+            key = station["station_id"]
+            value = json.dumps(station)
+
+            # Enviar el par clave-valor al tópico de Kafka
+            producer.send(topic=kafka_topic, key=key, value=value)
+            producer.flush()  # Asegura que el mensaje se envía inmediatamente
+
+    producer.close()
     # Esperar 10 segundos antes de la siguiente solicitud
     time.sleep(10)
