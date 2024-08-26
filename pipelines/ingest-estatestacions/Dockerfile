@@ -11,7 +11,6 @@ COPY data_ingestion.py /opt/data_ingestion.py
 # Set the working directory
 WORKDIR /opt
 
-COPY kafka-clients-3.5.1.jar /opt/spark/jars/kafka-clients-3.5.1.jar
 COPY kafka_client_jaas.conf /etc/kafka_client_jaas.conf
 
 # Set the entrypoint to run specific test:
