@@ -42,14 +42,15 @@ df = spark.readStream \
     .option("kafka.sasl.jaas.config", f'org.apache.kafka.common.security.plain.PlainLoginModule required username="{kafka_username}" password="{kafka_password}";') \
     .load()
 
-# Convertir los valores binarios de Kafka a strings
-parsedDf = df \
-    .selectExpr("CAST(value AS STRING) as value") \
-    .select(from_json(col("value"), schema).alias("data")) \
-    .select("data.*")
+# Convertir el JSON a columnas usando el esquema definido
+data_df = df.selectExpr("CAST(value AS STRING) as value").select(from_json(col("value"), schema).alias("data"))
+
+# Convertir el campo last_reported a un timestamp
+data_df = data_df.select("data.*") # Expandimos todas las columnas para asegurarnos que accedemos correctamente
+data_df = data_df.withColumn("last_reported", from_unixtime(col("last_reported")).cast("timestamp"))
 
 # Mostrar los datos en la consola
-query = parsedDf \
+query = data_df \
     .writeStream \
     .option("truncate", "false") \
     .outputMode("append") \

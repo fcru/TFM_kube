@@ -44,8 +44,7 @@ for i in range(6):
         for station in stations:
             # Acceder a los campos de cada estación
             key = station["station_id"]
-            station_status =  {"status": station["status"]}
-            #value = json.dumps(station_status)
+            #value = json.dumps(station_status) # No se debe hacer el dumps
             # Enviar el par clave-valor al tópico de Kafka
             producer.send(topic=kafka_topic, key=key, value=station)
             producer.flush()  # Asegura que el mensaje se envía inmediatamente
