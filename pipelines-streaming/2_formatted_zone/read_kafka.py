@@ -49,12 +49,19 @@ data_df = df.selectExpr("CAST(value AS STRING) as value").select(from_json(col("
 data_df = data_df.select("data.*") # Expandimos todas las columnas para asegurarnos que accedemos correctamente
 data_df = data_df.withColumn("last_reported", from_unixtime(col("last_reported")).cast("timestamp"))
 
-# Mostrar los datos en la consola
+# Escribir los datos procesados a un nuevo tópico de Kafka
+output_topic = "processed_estacions"
+
 query = data_df \
+    .selectExpr("to_json(struct(*)) AS value") \
     .writeStream \
-    .option("truncate", "false") \
-    .outputMode("append") \
-    .format("console") \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", kafka_bootstrap_servers) \
+    .option("topic", output_topic) \
+    .option("checkpointLocation", "/tmp/stream_estat_estacions/") \
+    .option("kafka.security.protocol", "SASL_PLAINTEXT") \
+    .option("kafka.sasl.mechanism", "PLAIN") \
+    .option("kafka.sasl.jaas.config", f'org.apache.kafka.common.security.plain.PlainLoginModule required username="{kafka_username}" password="{kafka_password}";') \
     .start()
 
 # Esperar hasta que se detenga el streaming
