@@ -34,16 +34,31 @@ def main():
         file_name = os.path.relpath(file_path, parent_directory)
         print(f"filename : {file_name}")
         if 'ESTACIONS' in file_name or 'INFORMACIO' in file_name or 'INFO' in file_name or 'STAT' in file_name:
-            print("Estacions or Informacio in pathfile")
-            year = file_name [:4]
-            month = file_name [5:7]
-            df = spark.read.parquet(file_path, header=True, inferSchema=True)
-            #df = df.withColumn("last_reported", F.col("last_reported").cast("int"))
-            #df.printSchema()
+            year = file_name[:4]
+            month = file_name[5:7]
             parent_directory = os.path.dirname(file_path)
             complementary_path = os.path.relpath(parent_directory, hdfs_base_dir)
             output_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/{complementary_path}/year={year}/month={month}"
-            df.write.mode("overwrite").parquet(output_path)
+            year_month=f"year={year}/month={month}"
+            if check_file_existence_hdfs(spark, output_path):
+                print(f"process cancelled, file {output_path} already exists")
+            elif int(year) > 2020 and year_month != "year=2022/month=03":
+                df = spark.read.parquet(file_path, header=True, inferSchema=True)
+                columns_to_drop = [ "short_name",
+                "nearby_distance",
+                "x_ride_code_support",
+                "rental_uris",
+                "cross_street",
+                "last_updated",
+                "ttl",
+                "V1",
+                "is_valet_station",
+                "x_valet_station_details",
+                "traffic"]
+                df = drop_existing_columns(columns_to_drop, df)
+                #df = df.withColumn("last_reported", F.col("last_reported").cast("int"))
+                #df.printSchema()
+                df.write.mode("overwrite").parquet(output_path)
         else:
             complementary_path = os.path.relpath(file_path, hdfs_base_dir)
             output_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/{complementary_path}"
