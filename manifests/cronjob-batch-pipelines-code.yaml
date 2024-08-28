@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: python-cronjob
+  name: batch-pipelines-cronjob
 spec:
   schedule: "0 * * * *"
   suspend: true
@@ -11,7 +11,7 @@ spec:
       template:
         spec:
           containers:
-            - name: python-container
-              image: python-code-image:latest
+            - name: pyspark-container
+              image: pipelines-batch-image:latest
               imagePullPolicy: Never
           restartPolicy: Never

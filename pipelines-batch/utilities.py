@@ -116,6 +116,12 @@ def list_files_by_condition (hdfs_path, fs, Path, condition='format'):
                   files.extend(list_files_by_condition(path_dir,fs,Path, condition))
     return files
 
+def drop_existing_columns(columns_to_drop,df):
 
+    # Filter the columns to drop based on their existence in the DataFrame
+    existing_columns_to_drop = [col for col in columns_to_drop if col in df.columns]
 
+    # Drop the existing columns
+    df = df.drop(*existing_columns_to_drop)
+    return df
 
