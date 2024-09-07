@@ -1,3 +1,4 @@
 pyspark
 pymongo
 kafka-python
+numpy

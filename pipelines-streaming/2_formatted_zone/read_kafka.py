@@ -1,6 +1,8 @@
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import from_json, col, from_unixtime, udf
+from pyspark.sql.functions import from_json, col, from_unixtime, udf, current_timestamp
 from pyspark.sql.types import *
+from pyspark.ml.clustering import KMeans
+from pyspark.ml.feature import VectorAssembler
 import urllib.request
 import json
 import logging
@@ -69,15 +71,25 @@ def fetch_data(url: str) -> DataFrame:
         logging.error(f"Error al descargar o procesar los datos: {e}")
         return None
 
-# Reemplaza la definición de datos estáticos con la llamada a fetch_data
+# Llamada a fetch_data
 url = 'https://opendata-ajuntament.barcelona.cat/data/ca/dataset/informacio-estacions-bicing/resource/f60e9291-5aaa-417d-9b91-612a9de800aa/download/Informacio_Estacions_Bicing_securitzat.json'
 dfInfo = fetch_data(url)
+
+# Configurar VectorAssembler para latitud y longitud
+assembler = VectorAssembler(inputCols=["lat", "lon"], outputCol="features")
+dfInfo_with_features = assembler.transform(dfInfo)
+
+# Aplicar K-means
+num_clusters = 3
+kmeans = KMeans(k=num_clusters, seed=1, featuresCol="features", predictionCol="cluster")
+model = kmeans.fit(dfInfo_with_features)
+dfInfo_with_clusters = model.transform(dfInfo_with_features)
 
 # Configuración de los parámetros para conectarse a Kafka con SASL/PLAIN
 kafka_bootstrap_servers = "kafka:9092"
 kafka_topic = "estat_estacions"
 kafka_username = "user1"
-kafka_password = "keNidKi3q5"
+kafka_password = "AGurTMY1rY"
 
 # Leer el stream de Kafka
 df = spark.readStream \
@@ -96,7 +108,6 @@ data_df = df.selectExpr("CAST(value AS STRING) as value").select(from_json(col("
 # Convertir el campo last_reported a un timestamp
 data_df = data_df.select("data.*") # Expandimos todas las columnas para asegurarnos que accedemos correctamente
 data_df = data_df.withColumn("last_reported", from_unixtime(col("last_reported")).cast("timestamp"))
-joined_df = data_df.join(dfInfo, on="station_id", how="left")
 
 # Función
 def check_bike_status(num_bikes_available, capacity):
@@ -104,7 +115,7 @@ def check_bike_status(num_bikes_available, capacity):
         return 'undefined'
     if capacity == 0:  # To avoid division by zero
         return 'undefined'
-    if float(num_bikes_available) <= 0.4 * float(capacity):
+    if float(num_bikes_available) <= 0.4 * float(capacity - (25 * capacity / 100)):
         return 'low'
     else:
         return 'sufficient'
@@ -112,22 +123,24 @@ def check_bike_status(num_bikes_available, capacity):
 # Registrar la función como UDF
 check_bike_status_udf = udf(check_bike_status, StringType())
 
-# Crear una nueva columna usando la UDF
-joined_df = joined_df.withColumn("check_status", check_bike_status_udf(joined_df["num_bikes_available"], joined_df["capacity"])) \
-                     .withColumn("rel.check_status", col("check_status")) \
-                     .withColumn("source.station_id", col("station_id")) \
-                     .withColumn("target.station_id", col("station_id"))
+# Unir con el DataFrame que contiene el estado de las estaciones y los clusters
+joined_df = data_df \
+    .join(dfInfo_with_clusters, on="station_id", how="left") \
+    .withColumn("check_status", check_bike_status_udf(data_df["num_bikes_available"], dfInfo_with_clusters["capacity"]))
 
-to_neo4j = joined_df.select("station_id", "capacity")
+to_neo4j = joined_df \
+                .select("station_id", "capacity", "cluster") \
+                .withColumn("lastUpdate", current_timestamp())
+
 
 # Write processed data to Neo4j
 query = to_neo4j \
     .writeStream \
     .format("org.neo4j.spark.DataSource") \
-    .outputMode("append") \
+    .option("url", "neo4j://neo4j-neo4j:7687") \
     .option("checkpointLocation", "/tmp/stream_estat_estacions/") \
-    .option("url", "bolt://neo4j-neo4j:7687") \
-    .option("labels", ":Station") \
+    .option("labels", "Station") \
     .option("node.keys", "station_id") \
+    .option("save.mode", "Overwrite") \
     .start() \
     .awaitTermination()
