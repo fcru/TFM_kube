@@ -33,7 +33,7 @@ for i in range(6):
         security_protocol='SASL_PLAINTEXT',  # Protocolo de seguridad
         sasl_mechanism='PLAIN',              # Mecanismo de SASL
         sasl_plain_username='user1',         # Usuario SASL (mismo que en jaas.conf)
-        sasl_plain_password='AGurTMY1rY',    # Contraseña SASL (mismo que en jaas.conf)
+        sasl_plain_password='dIegwBpHw6',    # Contraseña SASL (mismo que en jaas.conf)
         key_serializer=lambda k: str(k).encode('utf-8'),  # Serializar la clave como string UTF-8
         value_serializer=lambda v: json.dumps(v).encode('utf-8')  # Serializar el valor como JSON UTF-8
     )

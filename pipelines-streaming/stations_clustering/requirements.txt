@@ -1,4 +1,4 @@
 pyspark
-pymongo
 kafka-python
 numpy
+neo4j
