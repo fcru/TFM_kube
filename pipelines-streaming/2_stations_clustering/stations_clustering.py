@@ -29,7 +29,7 @@ neo4j_conn.close()
 
 # Crear una sesión de Spark
 spark = SparkSession.builder \
-    .appName("KafkaSparkStreaming") \
+    .appName("Clustering") \
     .getOrCreate()
 
 # Definir el esquema del DataFrame Informació Estacions
@@ -85,7 +85,7 @@ model = kmeans.fit(dfInfo_with_features)
 dfInfo_with_clusters = model.transform(dfInfo_with_features)
 
 # Escribir a Neo4j los nodos asignados a un cluster
-dfInfo_with_clusters.select("station_id", "capacity", "truck").write \
+dfInfo_with_clusters.select("station_id", "capacity", "truck", "lat", "lon").write \
     .format("org.neo4j.spark.DataSource") \
     .option("url", uri) \
     .mode("overwrite") \

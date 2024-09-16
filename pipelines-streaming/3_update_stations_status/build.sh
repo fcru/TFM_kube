@@ -2,6 +2,6 @@
 set -ex
 
 eval $(minikube docker-env)
-docker build -t stream-estat-estacions-image:latest .
+docker build -t stream-update-status-image:latest .
 
-kubectl apply -f cronjob-stream-estat-estacions-data.yaml
+kubectl apply -f cronjob-stream-update-status.yaml

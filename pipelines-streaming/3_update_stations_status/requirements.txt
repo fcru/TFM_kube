@@ -1,2 +1,3 @@
 pyspark
 kafka-python
+neo4j

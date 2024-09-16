@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, from_unixtime, udf, current_timestamp
+from pyspark.sql.functions import from_json, col, from_unixtime, udf, current_timestamp, sum as spark_sum, when, lit
 from pyspark.sql.types import *
 
 # Create a Spark session
@@ -26,7 +26,8 @@ schema = StructType([
 ])
 
 # Read data from Neo4j
-dfInfo_with_clusters = spark.read.format("org.neo4j.spark.DataSource") \
+dfInfo_with_clusters = spark.read \
+    .format("org.neo4j.spark.DataSource") \
     .option("url", "neo4j://neo4j-neo4j:7687") \
     .option("labels", "Station") \
     .load()
@@ -35,7 +36,7 @@ dfInfo_with_clusters = spark.read.format("org.neo4j.spark.DataSource") \
 kafka_bootstrap_servers = "kafka:9092"
 kafka_topic = "estat_estacions"
 kafka_username = "user1"
-kafka_password = "9ByaPLJwLc"
+kafka_password = "4upSLqDLTX"
 
 df = spark.readStream \
     .format("kafka") \
@@ -78,7 +79,7 @@ joined_df = data_df \
 
 # Prepare data to write back to Neo4j, adding the `lastUpdate` column
 to_neo4j = joined_df \
-    .select("station_id", "capacity", "truck", "check_status") \
+    .select("station_id", "capacity", "truck", "check_status", "num_bikes_available", "lat", "lon") \
     .withColumn("lastUpdate", current_timestamp())
 
 # Write the updated data back to Neo4j
