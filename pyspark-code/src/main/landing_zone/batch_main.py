@@ -1,16 +1,21 @@
 from batch_scrape_bicing import batch_bicing_download
 from batch_api import *
+from batch_meteocat_stadistics import download_Meteocat_stadistics
+from batch_meteocat_data import download_Meteocat_data
 import sys
 
 def show_options(new):
     print("Choose the option you want to execute:")
     print("\t 0 - Exit")
-    print("\t 1 - Batch download Información Etación files")
-    print("\t 2 - Batch download Estado Etación files")
+    print("\t 1 - Batch download Información Estación files")
+    print("\t 2 - Batch download Estado Estación files")
     print("\t 3 - Batch download TMB data(bus and metro lines, bus stops and metro stations  ")
     print("\t 4 - Batch Download Barcelona districts and streets Geojson")
     print("\t 5 - Batch Download Barcelona points of interest")
     print("\t 6 - Batch Download Barcelona population by age and sex")
+    print("\t 7 - Batch Download Meteocat statistics: mean by day (Temperatura, precipitación, humedad y viento)")
+    print("\t 8 - Batch Download Meteocat diary data variables (temperatura, precipitación, humedad y viento)")
+    print("\t 9 - Batch Download Barcelona Holidays")
 
 new = True
 show_options(new)
@@ -37,8 +42,6 @@ while op != 0:
 
         url = "https://api.tmb.cat/v1/transit/parades"
         download_API_data(url, 'bus_stops.json', "TMB")
-
-
     elif op == 4:
         url = ("https://opendata-ajuntament.barcelona.cat/data/dataset/808daafa-d9ce-48c0-925a-fa5afdb1ed41/"
                "resource/75197dfe-0306-4c5e-9643-34948af07fb6/download")
@@ -67,13 +70,52 @@ while op != 0:
                "94c7ea5d-c0b3-4482-bea8-6d5023844798/download")
         download_API_data(url, 'educative_centers.json', "bcn_data")
 
-
     elif op == 6:
         url = ("https://opendata-ajuntament.barcelona.cat/data/dataset/76835d18-34b4-475f-8ea0-abdfb77d2c0a/resource/"
                "b703115b-6930-4e71-bbb3-0e507ebd252e/download")
         download_API_data(url, 'population_by_sex_age_2024.json', "bcn_data")
+    elif op == 7:
+        #temperatura media
+        url = 'https://api.meteo.cat/xema/v1/variables/estadistics/diaris/1003'
+        download_Meteocat_stadistics(url, 'temperatura', 'METEOCAT')
 
+        #precipitación media
+        url = 'https://api.meteo.cat/xema/v1/variables/estadistics/diaris/1300'
+        download_Meteocat_stadistics(url, 'precipitacion', 'METEOCAT')
 
+        #humedad media
+        url = 'https://api.meteo.cat/xema/v1/variables/estadistics/diaris/1100'
+        download_Meteocat_stadistics(url, 'humedad', 'METEOCAT')
+
+        #viento media
+        url = 'https://api.meteo.cat/xema/v1/variables/estadistics/diaris/1503'
+        download_Meteocat_stadistics(url, 'viento', 'METEOCAT')
+    elif op == 8:
+        #url para la descarga de las lecturas periódicas de las variables de Meteocat
+        url = 'https://api.meteo.cat/xema/v1/variables/mesurades'
+        
+        year = 2024
+        current_year = datetime.now().year
+        while year <= current_year:
+            #Lecturas de Temperatura
+            download_Meteocat_data(url, 32, 'temperatura', 'METEOCAT', year)
+            #Lecturas de Precipitación
+            download_Meteocat_data(url, 35, 'precipitacion', 'METEOCAT', year)
+            #Lecturas de Humedad
+            download_Meteocat_data(url, 33, 'humedad', 'METEOCAT', year)
+            #Lecturas de Viento :falta viento del 22
+            download_Meteocat_data(url, 30, 'viento', 'METEOCAT', year)
+
+            year = year + 1
+        download_Meteocat_data(url, 30, 'viento', 'METEOCAT', 2022)
+        download_Meteocat_data(url, 30, 'viento', 'METEOCAT', 2023)
+    elif op == 9:
+        #Festivos generales de Catalunya
+        url ='https://analisi.transparenciacatalunya.cat/resource/8qnu-agns.json'
+        download_API_data(url, 'festivos_generales.json', "festivos")
+        #Festivos locales de Catalunya
+        url='https://analisi.transparenciacatalunya.cat/resource/b4eh-r8up.json?$limit=200000'
+        download_API_data(url, 'festivos_locales.json', "festivos")
     else:
         print ("Exiting ...")
         sys.exit()

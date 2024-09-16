@@ -9,6 +9,8 @@ from utilities import *
 def batch_bicing_download(url, type_api):
     spark = SparkSession.builder \
         .appName("Save file to hdfs") \
+        .config("spark.executor.heartbeatInterval", "30s") \
+        .config("spark.network.timeout", "300s") \
         .master("local[*]").getOrCreate()
 
     data = scrape_website(url)

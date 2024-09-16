@@ -1,19 +1,13 @@
 FROM spark:3.4.1-scala2.12-java11-python3-ubuntu
 
+ENV SPARK_EXECUTOR_MEMORY=4g
+ENV SPARK_DRIVER_MEMORY=4g
+
 USER root
 
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Spark-Job Example
-#COPY ./src/main/example/spark-job.py /opt/spark-job.py
-
-# MongoDB Example
-#COPY ./src/main/example/mongo-job.py /opt/mongo-job.py
-
-# Streaming job
-#COPY ./src/main/example/streaming-job.py /opt/streaming-job.py
 
 #Batch Scrape Ajuntament
 COPY ./src/main/ /opt/
@@ -21,10 +15,18 @@ COPY ./src/main/ /opt/
 # Set the working directory
 WORKDIR /opt
 
-# Commands to run kafka
-#COPY kafka-clients-3.5.1.jar /opt/spark/jars/kafka-clients-3.5.1.jar
-#COPY kafka_client_jaas.conf /etc/kafka_client_jaas.conf
-#ENV JAVA_TOOL_OPTIONS="-Djava.security.auth.login.config=/etc/kafka_client_jaas.conf"
+RUN curl -L -o /opt/spark/jars/mongo-spark-connector_2.12-10.1.1.jar \
+    https://repo1.maven.org/maven2/org/mongodb/spark/mongo-spark-connector_2.12/10.1.1/mongo-spark-connector_2.12-10.1.1.jar && \
+    curl -L -o /opt/spark/jars/mongodb-driver-sync-4.8.2.jar \
+    https://repo1.maven.org/maven2/org/mongodb/mongodb-driver-sync/4.8.2/mongodb-driver-sync-4.8.2.jar && \
+    curl -L -o /opt/spark/jars/mongodb-driver-core-4.8.2.jar \
+    https://repo1.maven.org/maven2/org/mongodb/mongodb-driver-core/4.8.2/mongodb-driver-core-4.8.2.jar && \
+    curl -L -o /opt/spark/jars/bson-4.8.2.jar \
+    https://repo1.maven.org/maven2/org/mongodb/bson/4.8.2/bson-4.8.2.jar && \
+    curl -L -o /opt/spark/jars/bson-record-codec-4.8.2.jar \
+    https://repo1.maven.org/maven2/org/mongodb/bson-record-codec/4.8.2/bson-record-codec-4.8.2.jar
+
+ENV PACKAGES=org.mongodb.spark:mongo-spark-connector_2.12:10.1.1
 
 # Set the entrypoint to run specific test:
 #ENTRYPOINT ["/opt/spark/bin/spark-submit", "/opt/spark-job.py"]

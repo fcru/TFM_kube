@@ -162,6 +162,6 @@ To do that, execute the build of build-pyspark.sh with the current setup.
 Once in k9s enter in the shell of the cronjob and then execute 
 
 ````
-python3 landing_zone/batch/batch_main.py
+python3 landing_zone/batch_main.py
 ```
 

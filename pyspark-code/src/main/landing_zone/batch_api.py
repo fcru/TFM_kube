@@ -11,7 +11,7 @@ from utilities import *
 APP_ID = os.getenv('APP_ID')
 APP_KEY = os.getenv('APP_KEY')
 
-def download_API_data(url,file_name, context):
+def download_API_data(url, file_name, context):
     spark = SparkSession.builder \
         .appName("Save file to hdfs") \
         .master("local[*]").getOrCreate()
@@ -26,3 +26,4 @@ def download_API_data(url,file_name, context):
         response = call_get_API(url)
 
     save_json_hdfs(spark,response,file_name,context)
+    spark.stop()
