@@ -2,6 +2,10 @@
 #   1. Formatear las fechas para tenerlas todas en el formato timestamp
 #   2. Dividir los ficheros por días
 #   3. Guardarlos en el directorio /formatted-zone/demanda/estaciones/{year}/{month} en formato parquet
+
+# MEJORA A IMPLEMENTAR: Cuando un fichero está procesado moverlo de carpeta. De esta manera se puede crear un cronjob para descargar los ficheros cada mes 
+# y posteriormente procesar
+
 import sys
 import os
 import gc
@@ -24,7 +28,7 @@ def formatBicingState():
 
     Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
     hdfs_path = f"/landing-zone/batch/estat_estacio/"
-    output_base_dir = "hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/estat"
+    output_base_dir = "hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/estat"
 
     all_files = get_FileList_From_HDFS_Path(fs, Path, hdfs_path)
 
@@ -73,7 +77,7 @@ def formatBicingState():
                         .withColumn("date", F.to_date("last_updated_local")) \
                         .withColumn("hour", F.date_format("last_updated_local", "HH:mm:ss"))
                     
-                    # Se guardan los datos del datframe en parket en HDFS. 
+                    # Se guardan los datos del datframe en parquet en HDFS. 
                     # Los ficheros los ubicamos en el directorio estat/año/mes
                     # separamos los ficheros con el objetivo de tener un fichero por día
                     unique_days = df_with_date.select("date").distinct().collect()
@@ -129,7 +133,7 @@ def validar_ficheros_por_fecha():
             if year == 2024 and mes > 7:
                 break
 
-            estat_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/estat/{year}/{str(mes).zfill(2)}"
+            estat_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/estat/{year}/{str(mes).zfill(2)}"
             
             previous_day, previous_month, previous_year = get_day_previous_month(year, mes)
             previous_date = datetime(previous_year, previous_month, previous_day)

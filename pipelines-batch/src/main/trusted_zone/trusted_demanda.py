@@ -374,8 +374,8 @@ def save_estado_to_Mongo(dia, mes, year):
 if __name__ == "__main__":
     #showFormattedData()
 
-    fecha_inicio = datetime(2023, 10, 10)
-    #fecha_fin = datetime(2021, 1, 1)
+    fecha_inicio = datetime(2024, 3, 18)
+    #fecha_inicio = datetime(2021, 1, 1)
     fecha_fin = datetime(2024, 7, 31)
 
     dia_actual = fecha_inicio
@@ -387,7 +387,6 @@ if __name__ == "__main__":
         merge_variables(dia,mes,year)
         time.sleep(2)
         generar_documento_final(dia, mes, year)
-        #save_informacio_to_Mongo(dia, mes, year)
         #time.sleep(1)
         #save_estado_to_Mongo(dia, mes, year)
         time.sleep(1)
