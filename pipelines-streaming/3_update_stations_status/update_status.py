@@ -30,13 +30,14 @@ dfInfo_with_clusters = spark.read \
     .format("org.neo4j.spark.DataSource") \
     .option("url", "neo4j://neo4j-neo4j:7687") \
     .option("labels", "Station") \
-    .load()
+    .load() \
+    .alias("info")
 
 # Kafka Configuration and reading the stream
 kafka_bootstrap_servers = "kafka:9092"
 kafka_topic = "estat_estacions"
 kafka_username = "user1"
-kafka_password = "4upSLqDLTX"
+kafka_password = "vgIGvT5Pjh"
 
 df = spark.readStream \
     .format("kafka") \
@@ -51,7 +52,8 @@ df = spark.readStream \
 # Convert the Kafka message to columns
 data_df = df.selectExpr("CAST(value AS STRING) as value") \
     .select(from_json(col("value"), schema).alias("data")) \
-    .select("data.*")
+    .select("data.*") \
+    .alias("data")
 
 # Convert `last_reported` from Unix timestamp to proper timestamp
 data_df = data_df.withColumn("last_reported", from_unixtime(col("last_reported")).cast("timestamp"))
@@ -75,11 +77,15 @@ check_bike_status_udf = udf(check_bike_status, StringType())
 # Join data from Kafka with data from Neo4j based on "station_id"
 joined_df = data_df \
     .join(dfInfo_with_clusters, on="station_id", how="left") \
-    .withColumn("check_status", check_bike_status_udf(data_df["num_bikes_available"], dfInfo_with_clusters["capacity"]))
+    .withColumn("check_status", check_bike_status_udf(data_df["num_bikes_available"], dfInfo_with_clusters["capacity"])) \
+    .withColumn("bikes_to_refill", when(col("check_status") == "low", \
+            (col("capacity") - (col("capacity") * 0.25) - col("data.num_bikes_available")).cast(IntegerType())).otherwise(None)) \
+    .withColumn("bikes_to_remove", when(col("check_status") == "full", \
+            (col("capacity") * 0.25).cast(IntegerType())).otherwise(None))
 
 # Prepare data to write back to Neo4j, adding the `lastUpdate` column
 to_neo4j = joined_df \
-    .select("station_id", "capacity", "truck", "check_status", "num_bikes_available", "lat", "lon") \
+    .select("station_id", "capacity", "truck", "check_status", "data.num_bikes_available", "lat", "lon") \
     .withColumn("lastUpdate", current_timestamp())
 
 # Write the updated data back to Neo4j

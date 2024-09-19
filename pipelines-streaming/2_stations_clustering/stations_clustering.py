@@ -24,7 +24,6 @@ uri = "neo4j://neo4j-neo4j:7687"
 
 neo4j_conn = Neo4jConnection(uri, "", "")
 neo4j_conn.query("MATCH (n) DETACH DELETE n")
-neo4j_conn.close()
 
 
 # Crear una sesión de Spark
@@ -121,6 +120,6 @@ MATCH (t:Truck), (s:Station)
 WHERE t.truck_id = s.truck
 CREATE (t)-[:SERVES]->(s)
 """
-neo4j_conn = Neo4jConnection(uri, "", "")
+
 neo4j_conn.query(cypher_query)
 neo4j_conn.close()
