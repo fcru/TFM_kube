@@ -1,0 +1,4 @@
+pyspark
+kafka-python
+numpy
+neo4j

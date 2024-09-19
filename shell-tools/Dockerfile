@@ -26,16 +26,26 @@ RUN apt install apt-transport-https && \
     apt update && \
     apt install -y neo4j
 
-# HDFS
-
+# Install Java 8 for Hadoop
 RUN apt-get update && \
     apt-get install -y openjdk-8-jdk
 
+# Set JAVA_HOME for Java 8
 ENV JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 
+# Install Java 17 for Neo4j and set as default
+RUN apt-get update && \
+    apt-get install -y openjdk-17-jdk
+
+# Set JAVA_HOME for Java 17
+ENV JAVA_HOME_17=/usr/lib/jvm/java-17-openjdk-amd64
+
+# Update PATH to include both Java versions
+ENV PATH="$JAVA_HOME/bin:$JAVA_HOME_17/bin:$PATH"
+
+# HDFS setup
 ENV HADOOP_VERSION 3.3.2
 ENV HADOOP_HOME=/opt/hadoop
-
 ENV HADOOP_COMMON_HOME=${HADOOP_HOME} \
     HADOOP_HDFS_HOME=${HADOOP_HOME} \
     HADOOP_MAPRED_HOME=${HADOOP_HOME} \
@@ -43,6 +53,7 @@ ENV HADOOP_COMMON_HOME=${HADOOP_HOME} \
     HADOOP_CONF_DIR=${HADOOP_HOME}/etc/hadoop \
     PATH=${PATH}:${HADOOP_HOME}/bin
 
+# Install Hadoop
 RUN wget https://archive.apache.org/dist/hadoop/common/hadoop-3.3.2/hadoop-3.3.2.tar.gz && \
     tar -xzf hadoop-${HADOOP_VERSION}.tar.gz && \
     mv hadoop-${HADOOP_VERSION} ${HADOOP_HOME} && \
