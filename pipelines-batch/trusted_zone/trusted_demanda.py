@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
-from pyspark.sql.types import IntegerType, DoubleType
+from pyspark.sql.types import IntegerType, DoubleType, LongType
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilities import *
@@ -199,7 +199,12 @@ def merge_meteo_data(spark, df, str_date, year, mes):
         else:
             df = df.withColumn(variable, F.lit(None).cast(DoubleType()))
     
-    df = df.withColumn("weather", F.struct(F.col("temperatura"), F.col("precipitacion"), F.col("humedad"), F.col("viento")))
+    df = df.withColumn("weather", F.struct(
+        F.col("temperatura").cast(DoubleType()).alias("temperatura"), 
+        F.col("precipitacion").cast(DoubleType()).alias("precipitacion"), 
+        F.col("humedad").cast(LongType()).alias("humedad"), 
+        F.col("viento").cast(DoubleType()).alias("viento")
+    ))
 
     return df
 
@@ -264,6 +269,8 @@ def generar_documento_final(dia, mes, year):
     if check_file_existence_hdfs(spark, estat_file):
         df_estat = spark.read.parquet(estat_file, header=True, inferSchema=True)
         df_estat.persist()
+
+        df_estat = df_estat.withColumn("station_id", F.col("station_id").cast(IntegerType()))
 
         # Aumentamos la granuralidad de los datos para poderlos guardar en MongoDB
 
@@ -371,26 +378,39 @@ def save_estado_to_Mongo(dia, mes, year):
     gc.collect()
 
 
+# Función en la que se pide al usuario la entrada de datos de una fecha
+def obtener_fecha(mensaje):
+    fecha_str = input(mensaje + "(formato: YYYY-MM-DD): ")
+    try:
+        return datetime.strptime(fecha_str, "%Y-%m-%d")
+    except ValueError:
+        print("Formato de fecha incorrecto. Inténtalo de nuevo.")
+        return obtener_fecha(mensaje)
+
 if __name__ == "__main__":
     #showFormattedData()
 
-    fecha_inicio = datetime(2024, 3, 18)
+    fecha_inicio = obtener_fecha("Introduce la fecha de inicio")
+    fecha_fin = obtener_fecha("Introduce la fecha fin")
+    #fecha_inicio = datetime(2023, 12, 13)
     #fecha_inicio = datetime(2021, 1, 1)
-    fecha_fin = datetime(2024, 7, 31)
+    #fecha_fin = datetime(2023, 12, 13)
+    if fecha_fin < fecha_inicio:
+        print("La fecha de fin no puede ser anterior a la fecha de inicio.")
+    else:
+        dia_actual = fecha_inicio
+        while dia_actual <= fecha_fin:
+            print(f"Procesando fecha: {dia_actual}")
+            dia = dia_actual.day
+            mes = dia_actual.month
+            year = dia_actual.year
+            merge_variables(dia,mes,year)
+            time.sleep(2)
+            generar_documento_final(dia, mes, year)
+            #time.sleep(1)
+            #save_estado_to_Mongo(dia, mes, year)
+            time.sleep(1)
 
-    dia_actual = fecha_inicio
-    while dia_actual <= fecha_fin:
-        print(f"Procesando fecha: {dia_actual}")
-        dia = dia_actual.day
-        mes = dia_actual.month
-        year = dia_actual.year
-        merge_variables(dia,mes,year)
-        time.sleep(2)
-        generar_documento_final(dia, mes, year)
-        #time.sleep(1)
-        #save_estado_to_Mongo(dia, mes, year)
-        time.sleep(1)
-
-        dia_actual += timedelta(days=1)
+            dia_actual += timedelta(days=1)
 
     print(f"Proceso trusted-zone finalizado correctamente")
