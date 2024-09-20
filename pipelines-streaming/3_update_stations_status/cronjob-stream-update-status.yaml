@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: stream-update-status-cronjob
+spec:
+  schedule: "* * * * *"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          containers:
+            - name: stream-update-status-container
+              image: stream-update-status-image:latest
+              imagePullPolicy: Never
+          restartPolicy: Never

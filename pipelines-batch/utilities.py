@@ -52,8 +52,11 @@ def save_json_hdfs(spark,response,file_name, context):
     json_str = json.dumps(data)
     rdd = spark.sparkContext.parallelize([json_str])
     df = spark.read.json(rdd)
+    df.show()
     hdfs_path=f"hdfs://hadooop-hadoop-hdfs-nn:9000/landing-zone/batch/{context}/{file_name}"
     df.write.mode("overwrite").parquet(hdfs_path)
+    df = spark.read.parquet(hdfs_path)
+    df.printSchema()
     print(f"JSON file successfully written to {hdfs_path}")
 
 
@@ -116,12 +119,35 @@ def list_files_by_condition (hdfs_path, fs, Path, condition='format'):
                   files.extend(list_files_by_condition(path_dir,fs,Path, condition))
     return files
 
-def drop_existing_columns(columns_to_drop,df):
+def get_HDFS_FileSystem(sc):
+    URI = sc._gateway.jvm.java.net.URI
+    FileSystem = sc._gateway.jvm.org.apache.hadoop.fs.FileSystem
+    Configuration = sc._gateway.jvm.org.apache.hadoop.conf.Configuration
 
-    # Filter the columns to drop based on their existence in the DataFrame
-    existing_columns_to_drop = [col for col in columns_to_drop if col in df.columns]
+    fs = FileSystem.get(URI("hdfs://hadooop-hadoop-hdfs-nn:9000"), Configuration())
+    return fs
 
-    # Drop the existing columns
-    df = df.drop(*existing_columns_to_drop)
-    return df
+def get_FileList_From_HDFS_Path(fs, Path, hdfs_path):
+    file_status = fs.listStatus(Path(hdfs_path))
+    files = []
+    for status in file_status:
+        file_path = status.getPath().toString()
+        if status.isDir() and (file_path.endswith(".json") or file_path.endswith(".csv")):
+            files.append(status.getPath().toString())
+        else:
+            files.extend(get_FileList_From_HDFS_Path(fs,Path,hdfs_path=status.getPath().toString()))
+
+    return files
+
+def delete_file_hdfs(spark, hdfs_path):
+    # hdfs_path si es un directorio borrará todo el contenido del directorio y si es un fichero borrará el fichero
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jvm.java.net.URI.create(hdfs_path),
+                                                        spark._jsc.hadoopConfiguration(), )
+    return fs.delete(spark._jvm.org.apache.hadoop.fs.Path(hdfs_path), True)
+
+def move_files_hdfs(spark, file_orig, file_dest):
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
+    origen = spark._jvm.org.apache.hadoop.fs.Path(file_orig)
+    destino = spark._jvm.org.apache.hadoop.fs.Path(file_dest)
+    fs.rename(origen, destino)
 
