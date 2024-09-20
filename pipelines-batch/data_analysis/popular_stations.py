@@ -292,11 +292,11 @@ df_combined = pd.concat([df, df_0_docks, df_100_docks], ignore_index=True)
 # Create GeoJSON location
 df_combined['location'] = df_combined.apply(lambda row: {
     'type': 'Point',
-    'coordinates': [float(row['lon']), float(row['lat']), float(row['alt'])]
+    'coordinates': [float(row['lon']), float(row['lat'])]
 }, axis=1)
 
 # Drop the original coordinate columns
-df_combined = df_combined.drop(columns=['lon', 'lat', 'alt'])
+df_combined = df_combined.drop(columns=['lon', 'lat'])
 
 # Sort the combined DataFrame
 df_combined = df_combined.sort_values(by=['year', 'month', 'usage_count'], ascending=[True, True, False])
