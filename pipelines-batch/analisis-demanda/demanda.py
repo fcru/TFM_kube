@@ -1,6 +1,34 @@
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from pyspark.sql.types import IntegerType
+from pyspark.sql.types import StringType
+
+def categorize_hour(hour):
+    if hour in [0, 1, 2, 3, 4, 5]:
+        return 'night'
+    elif hour in [6, 7, 8, 9]:
+        return 'early_morning'
+    elif hour in [10, 11, 12, 13, 14]:
+        return 'morning'
+    elif hour in [15, 16, 17, 18, 19]:
+        return 'afternoon'
+    elif hour in [20, 21, 22, 23]:
+        return 'evening'
+    else:
+        return None
+    
+def get_season(date):
+    day = date.day
+    month = date.month
+
+    if (month == 3 and day >= 21) or (3 < month < 6) or (month == 6 and day < 21):
+        return 'Primavera'
+    elif (month == 6 and day >= 21) or (6 < month < 9) or (month == 9 and day < 23):
+        return 'Verano'
+    elif (month == 9 and day >= 23) or (9 < month < 12) or (month == 12 and day < 21):
+        return 'Otoño'
+    else:
+        return 'Invierno'
+
 
 def readEstadoData():
     spark = SparkSession.builder \
@@ -12,13 +40,13 @@ def readEstadoData():
     df = spark.read.option("recursiveFileLookup", "true").parquet(estat_path)
     df.printSchema()
 
-    df = df.withColumn("status_exploded", F.explode(F.col("status")))
-    df = df.withColumn("station_id", F.col("station_id").cast(IntegerType()))
+    categorize_hour_udf = F.udf(categorize_hour, StringType())
+    get_season_udf = F.udf(get_season, StringType())
+    df = df.withColumn("status_exploded", F.explode(F.col("status"))) 
 
     df = df.selectExpr(
         "*", 
         "status_exploded.hora_dia as hora_dia",
-        "status_exploded.last_reported_local as last_reported_local",
         "status_exploded.num_bikes_available as num_bikes_available",
         "status_exploded.num_docks_available as num_docks_available",
         "status_exploded.num_bikes_error as num_bikes_error",
@@ -31,11 +59,20 @@ def readEstadoData():
         "status_exploded.weather.temperatura as temperatura",
         "status_exploded.weather.precipitacion as precipitacion",
         "status_exploded.weather.humedad as humedad",
-        "status_exploded.weather.viento as viento"
+        "status_exploded.weather.viento as viento",
+        "status_exploded.last_reported_local as last_reported_local",
     )
 
-    df = df.drop("status", "status_exploded")
+    df = df.withColumn("year", F.year(F.col("date_reported"))) \
+        .withColumn("month", F.month(F.col("date_reported"))) \
+        .withColumn("day", F.dayofmonth(F.col("date_reported"))) \
+        .withColumn("hora_info", categorize_hour_udf(F.col("hora_dia"))) \
+        .withColumn("season", get_season_udf(F.col("date_reported")))
+
+    df = df.drop("status", "status_exploded", "date_reported")
     df.printSchema()
+
+    df = df.dropDuplicates()
 
     local_output_path = "/home/lfiguerola/TFM/estado_bicing.csv"
     df.coalesce(1).write.mode("overwrite").csv(local_output_path, header=True)
