@@ -7,7 +7,7 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY stations_assignment.py /opt/stations_assignment.py
+COPY optimal_route.py /opt/optimal_route.py
 
 # Set the working directory
 WORKDIR /opt
@@ -19,5 +19,5 @@ COPY kafka-clients-3.5.1.jar /opt/spark/jars/kafka-clients-3.5.1.jar
 ENTRYPOINT ["/opt/spark/bin/spark-submit", \
             "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.neo4j:neo4j-connector-apache-spark_2.12:5.2.0_for_spark_3", \
             "--repositories", "https://repo1.maven.org/maven2/", \
-            "/opt/stations_assignment.py"]
+            "/opt/optimal_route.py"]
 
