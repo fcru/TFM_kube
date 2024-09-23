@@ -1,5 +1,7 @@
+from kafka import KafkaProducer
 from neo4j import GraphDatabase
 import itertools
+import json
 
 # Neo4jConnection Class
 class Neo4jConnection:
@@ -16,6 +18,17 @@ class Neo4jConnection:
 
 # URI for the Neo4j connection
 uri = "neo4j://neo4j-neo4j:7687"
+
+# Kafka Producer
+producer = KafkaProducer(
+    bootstrap_servers='kafka:9092',
+    security_protocol='SASL_PLAINTEXT',  # Protocolo de seguridad
+    sasl_mechanism='PLAIN',              # Mecanismo de SASL
+    sasl_plain_username='user1',         # Usuario SASL (mismo que en jaas.conf)
+    sasl_plain_password='0mjD6x78KQ',    # Contraseña SASL (mismo que en jaas.conf)
+    key_serializer=lambda k: str(k).encode('utf-8'),  # Serializar la clave como string UTF-8
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')  # Serializar el valor como JSON UTF-8
+)
 
 # Query to insert relationships with the distance between stations for each cluster
 insert_query = """
@@ -143,6 +156,15 @@ def get_trucks(neo4j_conn):
     result = neo4j_conn.query("MATCH (t:Truck) RETURN DISTINCT t.truck_id AS truck")
     return [record["truck"] for record in result]
 
+# Send paths to kafka
+def send_to_kafka(truck, optimal_route):
+    message = {
+        "truck_id": truck,
+        "optimal_route": optimal_route
+    }
+    producer.send(topic="truck-route", key=truck, value=message)
+    producer.flush()
+
 # Main logic
 def main():
     # Connect to Neo4j
@@ -155,9 +177,6 @@ def main():
 
         trucks = get_trucks(neo4j_conn)
         trucks.sort()
-
-        # Print the list of trucks obtained
-        print(f"Trucks retrieved: {trucks}")
 
         # Calculate the optimal route for each truck
         for truck in trucks:
@@ -172,11 +191,12 @@ def main():
 
             min_distance, optimal_route = find_optimal_route_fixed_start(neo4j_conn, start_station, remaining_stations)
 
-            #print(f"Truck {truck} - Optimal Distance: {min_distance}")
-            print(f"Truck {truck} - Optimal Route Path: {optimal_route}")
+            print(f"Truck {truck} - Optimal Distance: {min_distance} - Optimal Path: {optimal_route}")
+            send_to_kafka(truck, optimal_route)
 
     finally:
         neo4j_conn.query(drop_graph_query)
+        producer.close()
         neo4j_conn.close()
 
 if __name__ == "__main__":
