@@ -3,8 +3,8 @@ kind: CronJob
 metadata:
   name: clustering-stations-cronjob
 spec:
-  schedule: "* * * * *"
-  suspend: true
+  schedule: "0 */12 * * *"
+  suspend: false
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
