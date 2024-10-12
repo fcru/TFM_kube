@@ -28,7 +28,7 @@ def getInfoEstacionesXDay():
 
     Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
     hdfs_path = f"/landing-zone/batch/informacio/"
-    output_base_dir = "hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/informacio"
+    output_base_dir = "hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/informacio"
 
     all_files = get_FileList_From_HDFS_Path(fs, Path, hdfs_path)
 

@@ -18,80 +18,17 @@ from pyspark.sql.types import IntegerType, DoubleType, LongType
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilities import *
 
-def showFormattedData():
-    spark = SparkSession.builder \
-            .appName("Show Formatted data") \
-            .getOrCreate()
-        
-    estat_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/estat/2024/07/2024_07_31.parquet"
-    df_estat = spark.read.parquet(estat_path, header=True, inferSchema=True)
-    df_estat.persist()
-    print("ESTAT")
-    df_estat.printSchema()
-    df_estat.show()
-    df_estat.unpersist()
-
-    informacio_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/informacio/2024/07/2024_07_31.parquet"
-    df_informacio = spark.read.parquet(informacio_path, header=True, inferSchema=True)
-    df_informacio.persist()
-    print("INFORMACIO")
-    df_informacio.printSchema()
-    df_informacio.show()
-    df_informacio.unpersist()
-
-    festivos_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/festivos/holidays.parquet"
-    df_festivos = spark.read.parquet(festivos_path, header=True, inferSchema=True)
-    df_festivos.persist()
-    print("FESTIUS")
-    df_festivos.printSchema()
-    df_festivos.show()
-    df_festivos.unpersist()
-
-    temperatura_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/meteocat/temperatura/2024/07/temperatura_2024_07_31.parquet"
-    df_temperatura = spark.read.parquet(temperatura_path, header=True, inferSchema=True)
-    df_temperatura.persist()
-    print("TEMPERATURA")
-    df_temperatura.printSchema()
-    df_temperatura.show()
-    df_temperatura.unpersist()
-
-    humedad_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/meteocat/humedad/2024/07/humedad_2024_07_31.parquet"
-    df_humedad = spark.read.parquet(humedad_path, header=True, inferSchema=True)
-    df_humedad.persist()
-    print("HUMEDAD")
-    df_humedad.printSchema()
-    df_humedad.show()
-    df_humedad.unpersist()
-
-    precipitacion_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/meteocat/precipitacion/2024/07/precipitacion_2024_07_31.parquet"
-    df_precipitacion = spark.read.parquet(precipitacion_path, header=True, inferSchema=True)
-    df_precipitacion.persist()
-    print("PRECIPITACION")
-    df_precipitacion.printSchema()
-    df_precipitacion.show()
-    df_precipitacion.unpersist()
-
-    viento_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/meteocat/viento/2024/07/viento_2024_07_31.parquet"
-    df_viento = spark.read.parquet(viento_path, header=True, inferSchema=True)
-    df_viento.persist()
-    print("VIENTO")
-    df_viento.printSchema()
-    df_viento.show()
-    df_viento.unpersist()
-
-    spark.stop()
-    spark._jvm.System.gc()
 
 def merge_informacio(spark, df, str_date, year, mes):
     print("Mergin capacity")
-    info_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/informacio/{year}/{str(mes).zfill(2)}"
+    info_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/informacio/{year}/{str(mes).zfill(2)}"
     info_file = f"{info_path}/{str_date}.parquet"
 
     if check_file_existence_hdfs(spark, info_file):
         df_informacio = spark.read.parquet(info_file, header=True, inferSchema=True)
         df_informacio.persist()
 
-        #Estructuramos el dataframe de información para dejarlo en HDFS con la forma deseada antes de traspasarlo en una colección de MongoDB
+        #Estructuramos el dataframe de información para dejarlo en HDFS con la forma deseada antes de traspasarlo a Mongo o guardarlo en HDFS
         df_informacio = df_informacio \
             .withColumn("post_code", F.concat(F.lit('0'), F.col("post_code"))) \
             .withColumn("lon", F.col("lon").cast(DoubleType())) \
@@ -122,7 +59,7 @@ def merge_informacio(spark, df, str_date, year, mes):
 
 def merge_festivos(spark, df):
     print("Marging festivos")
-    holiday_file = "hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/festivos/holidays.parquet"
+    holiday_file = "hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/festivos/holidays.parquet"
     df_festivos = spark.read.parquet(holiday_file, header=True, inferSchema=True)
     df_festivos.persist()
 
@@ -178,7 +115,7 @@ def merge_meteo_data(spark, df, str_date, year, mes):
 
     variables_meteo = ["temperatura", "precipitacion", "humedad", "viento"]
     for variable in variables_meteo:
-        meteo_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/meteocat/{variable}/{year}/{str(mes).zfill(2)}"
+        meteo_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/meteocat/{variable}/{year}/{str(mes).zfill(2)}"
         meteo_file = f"{meteo_path}/{variable}_{str_date}.parquet"
         
         if check_file_existence_hdfs(spark, meteo_file):
@@ -217,7 +154,7 @@ def merge_variables(dia, mes, year):
     file_date = datetime(year, mes, dia)
     file_date_str = file_date.strftime('%Y_%m_%d')
 
-    estat_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/estat/{year}/{str(mes).zfill(2)}"
+    estat_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/estat/{year}/{str(mes).zfill(2)}"
     estat_file = f"{estat_path}/{file_date_str}.parquet"
 
     if check_file_existence_hdfs(spark, estat_file):
@@ -272,9 +209,9 @@ def generar_documento_final(dia, mes, year):
 
         df_estat = df_estat.withColumn("station_id", F.col("station_id").cast(IntegerType()))
 
-        # Aumentamos la granuralidad de los datos para poderlos guardar en MongoDB
+        # Aumentamos la granuralidad de los datos para poderlos guardar en MongoDB/HDFS según recursos disponibles
 
-        # Granularidad de 30 - no es posible
+        # Granularidad de 30 - no es posible guardar tantos datos. Recursos insuficientes
         # window_spec = Window.partitionBy("station_id", "date_reported", "last_reported_rounded").orderBy("last_reported_local")
         # df_merged = df_merged.withColumn("row_number", F.row_number().over(window_spec))
         # df_merged_filtered = df_merged.filter(F.col("row_number") == 1).drop("row_number")
@@ -302,7 +239,10 @@ def generar_documento_final(dia, mes, year):
         #         ), asc=True
         #     ).alias("status")
         # )
+        
         print("Generando df final")
+        # Nos quedamos únicamente con los datos necesarios para realizar los análisis de previsión de demanda por falta de recursos. 
+        # Dejamos el Dataframe con lo imprescindible
         df_estat_ag = df_final.groupBy("station_id", "date_reported").agg(
             F.sort_array(
                 F.collect_list(
@@ -337,50 +277,51 @@ def generar_documento_final(dia, mes, year):
     spark._jvm.System.gc()
 
 
-def save_estado_to_Mongo(dia, mes, year):
-    # Conexión a la base de datos de MongoDB
-    mongo_uri = "mongodb://mongodb:27017/bicing_db.estado_estaciones"
-    spark = SparkSession.builder \
-        .appName("SparkToMongo") \
-        .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1") \
-        .config("spark.mongodb.write.connection.uri", mongo_uri) \
-        .config("spark.mongodb.read.connection.uri", mongo_uri) \
-        .config("spark.mongodb.output.batchSize", "128") \
-        .config("spark.mongodb.output.writeConcern.w", "majority") \
-        .getOrCreate()
+# Por falta de recursos decidimos no almacenar los dato en MongoDB y para la previsión de la demanda generaremos un dataset a partir de los datos almacenados en HDFS
+# def save_estado_to_Mongo(dia, mes, year):
+#     # Conexión a la base de datos de MongoDB
+#     mongo_uri = "mongodb://mongodb:27017/bicing_db.estado_estaciones"
+#     spark = SparkSession.builder \
+#         .appName("SparkToMongo") \
+#         .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1") \
+#         .config("spark.mongodb.write.connection.uri", mongo_uri) \
+#         .config("spark.mongodb.read.connection.uri", mongo_uri) \
+#         .config("spark.mongodb.output.batchSize", "128") \
+#         .config("spark.mongodb.output.writeConcern.w", "majority") \
+#         .getOrCreate()
     
-    file_date = datetime(year, mes, dia)
-    file_date_str = file_date.strftime('%Y_%m_%d')
-    print(f"Estado: procesando fecha {file_date_str}")
+#     file_date = datetime(year, mes, dia)
+#     file_date_str = file_date.strftime('%Y_%m_%d')
+#     print(f"Estado: procesando fecha {file_date_str}")
 
-    # Creación colección informacion_estaciones
-    estat_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/estat/{year}/{str(mes).zfill(2)}"
-    estat_file = f"{estat_path}/{file_date_str}.parquet"
+#     # Creación colección informacion_estaciones
+#     estat_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/estat/{year}/{str(mes).zfill(2)}"
+#     estat_file = f"{estat_path}/{file_date_str}.parquet"
     
-    if check_file_existence_hdfs(spark, estat_file):
-        df_estat = spark.read.parquet(estat_file, header=True, inferSchema=True)
-        df_estat.persist()
+#     if check_file_existence_hdfs(spark, estat_file):
+#         df_estat = spark.read.parquet(estat_file, header=True, inferSchema=True)
+#         df_estat.persist()
         
-        print(f'count of lines: {df_estat.count()}')
+#         print(f'count of lines: {df_estat.count()}')
 
-        df_estat.write \
-            .format("mongodb") \
-            .mode("append") \
-            .save()
+#         df_estat.write \
+#             .format("mongodb") \
+#             .mode("append") \
+#             .save()
         
-        df_estat.unpersist()
-        del df_estat
+#         df_estat.unpersist()
+#         del df_estat
     
-    print(f"Estado: fecha {file_date_str} procesada")
-    # Stop the Spark session
-    spark.stop()
-    spark._jvm.System.gc()
-    gc.collect()
+#     print(f"Estado: fecha {file_date_str} procesada")
+#     # Stop the Spark session
+#     spark.stop()
+#     spark._jvm.System.gc()
+#     gc.collect()
 
 
 # Función en la que se pide al usuario la entrada de datos de una fecha
 def obtener_fecha(mensaje):
-    fecha_str = input(mensaje + "(formato: YYYY-MM-DD): ")
+    fecha_str = input(mensaje + " (formato: YYYY-MM-DD): ")
     try:
         return datetime.strptime(fecha_str, "%Y-%m-%d")
     except ValueError:
@@ -388,13 +329,8 @@ def obtener_fecha(mensaje):
         return obtener_fecha(mensaje)
 
 if __name__ == "__main__":
-    #showFormattedData()
-
     fecha_inicio = obtener_fecha("Introduce la fecha de inicio")
     fecha_fin = obtener_fecha("Introduce la fecha fin")
-    #fecha_inicio = datetime(2023, 12, 13)
-    #fecha_inicio = datetime(2021, 1, 1)
-    #fecha_fin = datetime(2023, 12, 13)
     if fecha_fin < fecha_inicio:
         print("La fecha de fin no puede ser anterior a la fecha de inicio.")
     else:

@@ -18,13 +18,16 @@ API_KEY_METEOCAT = os.getenv('API_KEY_METEOCAT')
 def download_Meteocat_data(url, variable, file, context, year):
     spark = SparkSession.builder \
         .appName("Save file to hdfs") \
+        .config("spark.executor.memory", "8g") \
+        .config("spark.driver.memory", "8g") \
+        .config("spark.executor.cores", "6") \
         .master("local[*]").getOrCreate()
     
     # obtener datos de la variable especificada para todos los días del año entre 01/03/2019 y 
     # el dìa de ayer
     cal = calendar.Calendar()
     current_year = datetime.now().year
-    current_month = datetime.now().month
+    current_month = 7 # datetime.now().month
     
     for month in range(1,13):
         if year == current_year and month > current_month:
@@ -60,7 +63,7 @@ def download_Meteocat_data(url, variable, file, context, year):
 
                 spark._jvm.System.gc()
 
-                time.sleep(3)
+                time.sleep(1)
         
     spark.stop()
 

@@ -39,7 +39,7 @@ def formatHolidays():
     # unión de ambos dataframes en uno
     df_festivos = df_generales_final.union(df_locales_final)
 
-    df_festivos.write.mode("overwrite").parquet("hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/festivos/holidays.parquet")
+    df_festivos.write.mode("overwrite").parquet("hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/festivos/holidays.parquet")
     print(f"File saved in HDFS")
 
     spark.stop()

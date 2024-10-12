@@ -94,7 +94,7 @@ while op != 0:
         #url para la descarga de las lecturas periódicas de las variables de Meteocat
         url = 'https://api.meteo.cat/xema/v1/variables/mesurades'
         
-        year = 2024
+        year = 2021
         current_year = datetime.now().year
         while year <= current_year:
             #Lecturas de Temperatura
@@ -107,8 +107,8 @@ while op != 0:
             download_Meteocat_data(url, 30, 'viento', 'METEOCAT', year)
 
             year = year + 1
-        download_Meteocat_data(url, 30, 'viento', 'METEOCAT', 2022)
-        download_Meteocat_data(url, 30, 'viento', 'METEOCAT', 2023)
+        #download_Meteocat_data(url, 30, 'viento', 'METEOCAT', 2022)
+        #download_Meteocat_data(url, 30, 'viento', 'METEOCAT', 2023)
     elif op == 9:
         #Festivos generales de Catalunya
         url ='https://analisi.transparenciacatalunya.cat/resource/8qnu-agns.json'

@@ -24,7 +24,7 @@ def formatMeteocatData(variable):
 
     Path = sc._gateway.jvm.org.apache.hadoop.fs.Path
     hdfs_path = f"/landing-zone/batch/METEOCAT/{variable}"
-    output_base_dir = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/demanda/meteocat/{variable}"
+    output_base_dir = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/meteocat/{variable}"
 
     all_files = get_FileList_From_HDFS_Path(fs, Path, hdfs_path)
     
@@ -74,7 +74,7 @@ def formatMeteocatData(variable):
                     # Forzamos la liberación de memoria de Spark
                     spark._jvm.System.gc()
 
-                    time.sleep(3)
+                    time.sleep(1)
 
     spark.stop()
 
