@@ -9,3 +9,6 @@ folium
 streamlit-folium
 contextily
 shapely
+scikit-learn
+numpy
+scipy

@@ -14,6 +14,24 @@ def drop_station_id(station_id):
     result = collection.delete_many({"station_id": station_id})
     print(f"Deleted {result.deleted_count} documents with station_id: {station_id}")
 
+    # Find and drop duplicates based on station_id and date
+    duplicates = collection.aggregate([
+        {"$group": {
+            "_id": {"station_id": "$station_id", "date": "$date"},
+            "count": {"$sum": 1},
+            "docs": {"$push": "$_id"}
+        }},
+        {"$match": {"count": {"$gt": 1}}}
+    ], allowDiskUse=True)  # Enable disk use for the aggregation
+
+    for duplicate in duplicates:
+        # Keep the first document and remove the rest
+        ids_to_delete = duplicate["docs"][1:]  # Keep the first document
+        collection.delete_many({"_id": {"$in": ids_to_delete}})
+        print(
+            f"Deleted {len(ids_to_delete)} duplicate documents with station_id: {duplicate['_id']['station_id']} and date: {duplicate['_id']['date']}")
+
+
 def generate_null_values_count_report():
     pipeline = [
         {
@@ -32,8 +50,7 @@ def generate_null_values_count_report():
                         {"$eq": ["$name", None]},
                         {"$eq": ["$name", ""]},
                         {"$eq": ["$capacity", None]},
-                        {"$eq": ["$lat", None]},
-                        {"$eq": ["$lon", None]},
+                        {"$eq": ["$geometry", None]},
                         {"$eq": ["$altitude", None]},
                         {"$eq": ["$address", None]},
                         {"$eq": ["$address", ""]},
@@ -82,8 +99,7 @@ def update_null_values():
                     "$first": {
                         "name": {"$cond": [{"$ne": ["$name", None]}, "$name", "$$REMOVE"]},
                         "capacity": {"$cond": [{"$ne": ["$capacity", None]}, "$capacity", "$$REMOVE"]},
-                        "lat": {"$cond": [{"$ne": ["$lat", None]}, "$lat", "$$REMOVE"]},
-                        "lon": {"$cond": [{"$ne": ["$lon", None]}, "$lon", "$$REMOVE"]},
+                        "geometry": {"$cond": [{"$ne": ["$geometry", None]}, "$geometry", "$$REMOVE"]},
                         "altitude": {"$cond": [{"$ne": ["$altitude", None]}, "$altitude", "$$REMOVE"]},
                         "address": {"$cond": [{"$ne": ["$address", None]}, "$address", "$$REMOVE"]},
                         "post_code": {"$cond": [{"$ne": ["$post_code", None]}, "$post_code", "$$REMOVE"]}
