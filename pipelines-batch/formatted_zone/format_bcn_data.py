@@ -32,10 +32,6 @@ def format_bcn_data(output_base_dir,hdfs_path):
             category = category.replace("_"," ")
             df_extracted = df.select(
                 F.col("name"),
-                F.expr("filter(addresses, a -> a.main_address = true)[0].address_name").alias("address_name"),
-                F.expr("filter(addresses, a -> a.main_address = true)[0].start_street_number").alias(
-                    "start_street_number"),
-                F.expr("filter(addresses, a -> a.main_address = true)[0].zip_code").alias("zip_code"),
                 F.lit(category).alias("category"),
                 F.concat(F.lit("POINT("), F.col("geo_epgs_4326_latlon.lon"), F.lit(" "),
                          F.col("geo_epgs_4326_latlon.lat"), F.lit(")")).alias("geometry")  # WKT format
@@ -51,7 +47,7 @@ def format_bcn_data(output_base_dir,hdfs_path):
             df_extracted = df.select(
                 F.explode("features").alias("feature")
             ).select(
-                F.col("feature.properties.Nom_Activitat").alias("activity_name"),
+                F.col("feature.properties.Nom_Activitat").alias("name"),
                 F.lit("Commercial Activities").alias("category"),
                 F.concat(F.lit("POINT("), F.col("feature.properties.Longitud"), F.lit(" "),
                          F.col("feature.properties.Latitud"), F.lit(")")).alias("geometry")  # WKT format
@@ -59,22 +55,24 @@ def format_bcn_data(output_base_dir,hdfs_path):
 
             # Remove rows where required fields are null
             df_final = df_extracted.filter(
-                (F.col("activity_name").isNotNull()) &
+                (F.col("name").isNotNull()) &
                 (F.col("geometry").isNotNull())  # geometry replaces latitude and longitude
             )
 
         elif file_name == "bcn_census_areas.json" or file_name == "bcn_neighbourhood.json":
             # Drop the 'geometria_etrs89' column
             df = df.drop("geometria_etrs89")
-            # Rename 'geometria_wgs84' to 'geometry' to match the expected output
-            df_final = df.withColumnRenamed("geometria_wgs84", "geometry")
+            df_final = df.select(
+                F.col("geometria_wgs84").alias("geometry"),
+                F.col("nom_barri").alias("name"),
+            )
 
         elif file_name == "bus_stops.json":
             df_final = df.select(
                 F.explode("features").alias("features")
             ).select(
                 F.col("features.geometry").alias("geometry"),
-                F.col("features.properties.NOM_PARADA").alias("stop_name"),
+                F.col("features.properties.NOM_PARADA").alias("name"),
                 F.col("features.properties.DESC_PARADA").alias("stop_description")
             )
 
@@ -83,7 +81,7 @@ def format_bcn_data(output_base_dir,hdfs_path):
                 F.explode("features").alias("features")
             ).select(
                 F.col("features.geometry").alias("geometry"),
-                F.col("features.properties.NOM_LINIA").alias("line_name"),
+                F.col("features.properties.NOM_LINIA").alias("name"),
                 F.col("features.properties.DESC_LINIA").alias("line_description")
             )
 
@@ -92,7 +90,7 @@ def format_bcn_data(output_base_dir,hdfs_path):
                 F.explode("features").alias("features")
             ).select(
                 F.col("features.geometry").alias("geometry"),
-                F.col("features.properties.NOM_ESTACIO").alias("station_name"),
+                F.col("features.properties.NOM_ESTACIO").alias("name"),
                 F.col("features.properties.PICTO").alias("metro_line")
             )
 

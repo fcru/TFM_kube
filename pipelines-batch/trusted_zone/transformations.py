@@ -166,7 +166,7 @@ def check_document_exists(mongo_uri, date):
         return False
 
     # Perform query to check if document with specified date exists
-    query = {"date": date.strftime("%Y-%m-%d")}
+    query = {"date": date}
     result = db[collection_name].find_one(query)
 
     if result:
@@ -191,6 +191,17 @@ def consolidate_estacio():
 
         information_path = "hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/informacio_consolidate"
         df_informacio = spark.read.parquet(information_path)
+        df_informacio = df_informacio.withColumn(
+            'geometry',
+            F.struct(
+                F.lit('Point').alias('type'),
+                F.array(F.col('lon').cast('float'), F.col('lat').cast('float')).alias('coordinates')
+            )
+        )
+
+        # Drop the 'lon' and 'lat' columns
+        df_informacio = df_informacio.drop('lon', 'lat')
+
         df_informacio_renamed = df_informacio.withColumnRenamed("station_id", "station_id_info")
         df_informacio_renamed.persist()
 
@@ -250,8 +261,7 @@ def consolidate_estacio():
                     df_grouped = consolidate_estacio_day.groupBy("station_id", "date").agg(
                         # Aggregate main document fields
                         expr("first(name) as name"),
-                        expr("first(lat) as lat"),
-                        expr("first(lon) as lon"),
+                        expr("first(geometry) as geometry"),
                         expr("first(altitude) as altitude"),
                         expr("first(address) as address"),
                         expr("first(post_code) as post_code"),
@@ -265,10 +275,9 @@ def consolidate_estacio():
                     # Transform the aggregated data into the MongoDB document format
                     df_transformed = df_grouped.select(
                         col("station_id"),
-                        date_format("date", "yyyy-MM-dd").alias("date"),
+                        F.to_date(col("date")).alias("date"),
                         col("name"),
-                        col("lat"),
-                        col("lon"),
+                        col("geometry"),
                         col("altitude"),
                         col("address"),
                         col("post_code"),
@@ -299,6 +308,15 @@ def consolidate_estacio():
             spark._jvm.System.gc()
         print("Finished processing.")
 
+
+def union_df(df1_path,df2_path,output_path):
+    spark = SparkSession.builder \
+        .appName("union_df") \
+        .getOrCreate()
+    df1 = spark.read.parquet(df1_path)
+    df2 = spark.read.parquet(df2_path)
+    df=df1.union(df2)
+    df.write.mode("overwrite").parquet(output_path)
 
 def process_json_files_to_mongodb(root_path):
     # Initialize Spark session
@@ -357,3 +375,33 @@ def process_json_files_to_mongodb(root_path):
     finally:
         # Stop Spark session
         spark.stop()
+
+def write_informacio_to_mongo():
+    mongo_uri = "mongodb://mongodb:27017/bicing_db.all_stations"
+    spark = SparkSession.builder \
+        .appName("SparkToMongo") \
+        .config("spark.jars.packages", "org.mongodb.spark:mongo-spark-connector_2.12:10.1.1") \
+        .config("spark.mongodb.write.connection.uri", mongo_uri) \
+        .config("spark.mongodb.read.connection.uri", mongo_uri) \
+        .config("spark.mongodb.output.writeConcern.w", "majority") \
+        .config("spark.mongodb.output.batchSize", "128") \
+        .getOrCreate()
+
+    information_path = "hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/informacio_consolidate"
+    df_informacio = spark.read.parquet(information_path)
+    df_informacio = df_informacio.withColumn(
+        'geometry',
+        F.struct(
+            F.lit('Point').alias('type'),
+            F.array(F.col('lon').cast('float'), F.col('lat').cast('float')).alias('coordinates')
+        )
+    )
+
+    # Drop the 'lon' and 'lat' columns
+    df_informacio = df_informacio.drop('lon', 'lat')
+    df_informacio.write \
+        .format("mongodb") \
+        .mode("append") \
+        .option("uri", mongo_uri) \
+        .save()
+
