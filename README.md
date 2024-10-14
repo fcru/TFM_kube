@@ -99,7 +99,14 @@ KafkaClient {
 ## Create a topic
 In the cronjob-shell-tools shell:
 ```
-KAFKA_OPTS="-Djava.security.auth.login.config=jaas.conf" kafka-topics --create --topic my-topic --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --command-config client.properties
+KAFKA_OPTS="-Djava.security.auth.login.config=jaas.conf" kafka-topics --create --topic truck-route --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1 --command-config client.properties
+```
+## Delete a topic
+In the cronjob-shell-tools shell:
+```
+KAFKA_OPTS="-Djava.security.auth.login.config=jaas.conf" kafka-topics --delete --topic truck-route --bootstrap-server kafka:9092 --command-config client.properties
+
+
 ```
 
 ## Produce Events
@@ -109,7 +116,7 @@ kafka-console-producer --producer.config client.properties --broker-list kafka:9
 
 ## Consume Events
 ```
-kafka-console-consumer --consumer.config client.properties --bootstrap-server kafka:9092 --topic my-topic --from-beginning --property print.key=true --property key.separator=" : "
+kafka-console-consumer --consumer.config client.properties --bootstrap-server kafka:9092 --topic truck-route --from-beginning --property print.key=true --property key.separator=" : "
 ```
 
 # Install Neo4j

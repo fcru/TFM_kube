@@ -1,0 +1,9 @@
+python-dotenv
+geojson
+geopandas
+streamlit
+folium
+streamlit-folium
+contextily
+shapely
+confluent-kafka

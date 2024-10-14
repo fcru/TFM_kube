@@ -2,6 +2,6 @@
 set -ex
 
 eval $(minikube docker-env)
-docker build -t stations-assignment-image:latest .
+docker build -t optimal-route-image:latest .
 
-kubectl apply -f cronjob-stations-assignment.yaml
+kubectl apply -f cronjob-optimal-route.yaml

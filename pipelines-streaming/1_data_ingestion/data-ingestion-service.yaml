@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingest-estat-estacions-service  # Nombre del servicio
+spec:
+  selector:
+    app: ingest-estat-estacions  # Selector que apunta a los pods de tu CronJob
+  type: NodePort  # Puedes cambiarlo a ClusterIP si prefieres un acceso solo interno
+  ports:
+    - protocol: TCP
+      port: 8000          # El puerto del servicio
+      targetPort: 8000    # El puerto en el contenedor
+      nodePort: 30000     # El puerto externo (dentro del rango 30000-32767)
+

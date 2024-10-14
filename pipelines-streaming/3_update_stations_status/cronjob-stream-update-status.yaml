@@ -4,7 +4,7 @@ metadata:
   name: stream-update-status-cronjob
 spec:
   schedule: "*/10 * * * *"
-  suspend: false
+  suspend: true
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
