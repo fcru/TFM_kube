@@ -37,7 +37,7 @@ dfInfo_with_clusters = spark.read \
 kafka_bootstrap_servers = "kafka:9092"
 kafka_topic = "estat_estacions"
 kafka_username = "user1"
-kafka_password = "fY6mjamEAH"
+kafka_password = "VfEMlDomej"
 
 df = spark.readStream \
     .format("kafka") \

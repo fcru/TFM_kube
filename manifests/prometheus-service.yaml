@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service  # Nombre del servicio para Prometheus
+spec:
+  selector:
+    app: prometheus  # El selector debe coincidir con las etiquetas de tu pod de Prometheus
+  type: ClusterIP  # O NodePort si necesitas acceso externo
+  ports:
+    - protocol: TCP
+      port: 9090  # Puerto del servicio
+      targetPort: 9090  # Puerto del contenedor de Prometheus

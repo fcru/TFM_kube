@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana
+  namespace: argocd
+spec:
+  destination:
+    namespace: default
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    helm:
+      parameters:
+        - name: persistence.enabled
+          value: "false"
+        - name: adminPassword
+          value: "admin"
+        - name: service.type
+          value: "NodePort"  # Exponer Grafana como NodePort
+    repoURL: https://grafana.github.io/helm-charts
+    chart: grafana
+    targetRevision: 6.58.4
+  syncPolicy:
+    automated: {}
