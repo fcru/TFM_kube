@@ -80,7 +80,7 @@ for i in range(6):
     iteration_duration.set(time.time() - start_time)
 
     # Push metrics to Pushgateway
-    push_to_gateway('pushgateway:9091', job='pyspark_kafka_job', registry=registry)
+    push_to_gateway('pushgateway:9091', job='data_ingestion', registry=registry)
 
     # Wait 10 seconds before the next request
     time.sleep(10)

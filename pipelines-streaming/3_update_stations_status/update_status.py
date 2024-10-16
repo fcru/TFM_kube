@@ -1,4 +1,4 @@
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import from_json, col, from_unixtime, current_timestamp, when, lit
 from pyspark.sql.types import *
 
@@ -59,24 +59,44 @@ data_df = df.selectExpr("CAST(value AS STRING) as value") \
 data_df = data_df.withColumn("last_reported", from_unixtime(col("last_reported")).cast("timestamp"))
 
 # Renombrar la columna num_bikes_available en dfInfo_with_clusters
-dfInfo_with_clusters = dfInfo_with_clusters.withColumnRenamed("num_bikes_available", "info_num_bikes_available")
+#dfInfo_with_clusters = dfInfo_with_clusters.withColumnRenamed("num_bikes_available", "info_num_bikes_available")
 
-# Join data from Kafka with data from Neo4j based on "station_id" and assign a status
-joined_df = data_df \
-    .join(dfInfo_with_clusters, on="station_id", how="left") \
-    .withColumn("check_status",
-        when(col("data.num_bikes_available").isNull() | col("info.capacity").isNull(), "undefined")
-        .when(col("info.capacity") == 0, "undefined")
-        .when(col("data.num_bikes_available") <= 0.4 * (col("info.capacity") - (0.25 * col("info.capacity"))), "low")
-        .when(col("info.capacity") == col("data.num_bikes_available"), "full")
+# Select the desired columns
+data_df = data_df.select("station_id", "num_bikes_available", "last_reported")
+dfInfo_with_clusters = dfInfo_with_clusters.select("station_id", "capacity", "truck", "lat", "lon")
+
+# Join data from Kafka with data from Neo4j based on "station_id"
+def join_data(data_df: DataFrame, dfInfo_with_clusters: DataFrame) -> DataFrame:
+    joined_df = data_df.join(
+        dfInfo_with_clusters,
+        on="station_id",
+        how="left"
+    )
+    return joined_df
+
+# Assign a status and calculate the bikes to be replaced or removed
+def assign_status(joined_df: DataFrame) -> DataFrame:
+    status_df = joined_df.withColumn(
+        "check_status",
+        when(col("num_bikes_available").isNull() | col("capacity").isNull(), "undefined") \
+        .when(col("capacity") == 0, "undefined") \
+        .when(col("num_bikes_available") <= 0.4 * (col("capacity") - (0.25 * col("capacity"))), "low") \
+        .when(col("capacity") == col("num_bikes_available"), "full") \
         .otherwise("sufficient")
-    ) \
-    .withColumn("bikes_to_refill", when(col("check_status") == "low", (col("info.capacity") - (0.25 * col("info.capacity")) - col("data.num_bikes_available")).cast(IntegerType())).otherwise(None)) \
-    .withColumn("bikes_to_remove", when(col("check_status") == "full", (0.25 * col("info.capacity")).cast(IntegerType())).otherwise(None))
+    ).withColumn(
+        "bikes_to_refill",
+        when(col("check_status") == "low", (col("capacity") - (0.25 * col("capacity")) - col("num_bikes_available")).cast(IntegerType())).otherwise(None)
+    ).withColumn(
+        "bikes_to_remove",
+        when(col("check_status") == "full", (0.25 * col("capacity")).cast(IntegerType())).otherwise(None)
+    )
+    return status_df
 
-# Prepare data to write back to Neo4j, adding the `lastUpdate` column
-to_neo4j = joined_df \
-    .select("station_id", "capacity", "truck", "check_status", "data.num_bikes_available", "lat", "lon") \
+joined_df = join_data(data_df, dfInfo_with_clusters)
+status_df = assign_status(joined_df)
+
+# Add the `lastUpdate` column
+to_neo4j = status_df \
     .withColumn("lastUpdate", current_timestamp())
 
 # Write the updated data back to Neo4j
