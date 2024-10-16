@@ -14,7 +14,7 @@ conf = {
     'security.protocol': 'SASL_PLAINTEXT',
     'sasl.mechanism': 'PLAIN',
     'sasl.username': 'user1',
-    'sasl.password': 'VfEMlDomej'
+    'sasl.password': 'tiSmu50tsg'
 }
 
 consumer = Consumer(conf)

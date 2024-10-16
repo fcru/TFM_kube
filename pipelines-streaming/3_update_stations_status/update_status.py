@@ -37,7 +37,7 @@ dfInfo_with_clusters = spark.read \
 kafka_bootstrap_servers = "kafka:9092"
 kafka_topic = "estat_estacions"
 kafka_username = "user1"
-kafka_password = "VfEMlDomej"
+kafka_password = "tiSmu50tsg"
 
 df = spark.readStream \
     .format("kafka") \
@@ -61,7 +61,7 @@ data_df = data_df.withColumn("last_reported", from_unixtime(col("last_reported")
 # Renombrar la columna num_bikes_available en dfInfo_with_clusters
 dfInfo_with_clusters = dfInfo_with_clusters.withColumnRenamed("num_bikes_available", "info_num_bikes_available")
 
-# Join data from Kafka with data from Neo4j based on "station_id"
+# Join data from Kafka with data from Neo4j based on "station_id" and assign a status
 joined_df = data_df \
     .join(dfInfo_with_clusters, on="station_id", how="left") \
     .withColumn("check_status",
