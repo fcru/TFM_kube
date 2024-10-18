@@ -65,16 +65,16 @@ def filter_estacio_to_gdf(df_to_filter):
             df['geometry'] = df['coordinates'].apply(
                 lambda x: Point(x) if isinstance(x, list) and len(x) == 2 else None)
         else:
-            return None, f"No geometry or coordinates found in collection {collection_name}"
+            return None, f"No geometry or coordinates found in collection estacio"
 
         gdf = gpd.GeoDataFrame(df, geometry='geometry').dropna(subset=['geometry'])
         if len(gdf) == 0:
-            return None, f"No valid geometries found in collection {collection_name}"
+            return None, f"No valid geometries found in collection estacio"
 
         gdf.set_crs(epsg=4326, inplace=True)
         return gdf, None
     except Exception as e:
-        return None, f"Error processing {collection_name}: {str(e)}"
+        return None, f"Error processing estacio: {str(e)}"
 
 def doc_to_gdf(collection_name, limit=None, fields=None):
     try:

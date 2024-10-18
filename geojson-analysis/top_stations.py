@@ -4,11 +4,6 @@ from pymongo import MongoClient
 import geopandas as gpd
 from utilities import *
 
-def get_top_10_stations(df):
-    top_stations = df.groupby(['year', 'station_id']).agg({'count': 'sum'}).reset_index()
-    top_10 = top_stations.sort_values(['year', 'count'], ascending=[True, False]).groupby('year').head(10)
-    return top_10
-
 def geometry_to_string(geom):
     if isinstance(geom, dict):
         return json.dumps(geom)
@@ -34,8 +29,13 @@ def find_top_stations():
 
     # Aggregation for num_bikes_available = 0
     pipeline_bikes = [
+        # Unwind the status array
         {"$unwind": "$status"},
+
+        # Match documents where num_bikes_available is 0
         {"$match": {"status.num_bikes_available": 0}},
+
+        # Group by station, year, and month
         {
             "$group": {
                 "_id": {
@@ -50,13 +50,55 @@ def find_top_stations():
                 "address": {"$first": "$address"},
                 "post_code": {"$first": "$post_code"}
             }
-        }
+        },
+
+        # Group by station to calculate average monthly count
+        {
+            "$group": {
+                "_id": {
+                    "station_id": "$_id.station_id",
+                    "name": "$name",
+                    "geometry": "$geometry",
+                    "altitude": "$altitude",
+                    "address": "$address",
+                    "post_code": "$post_code"
+                },
+                "avg_monthly_count": {"$avg": "$count"},
+                "months_count": {"$sum": 1}  # Count of months with data
+            }
+        },
+
+        # Project final output
+        {
+            "$project": {
+                "_id": 0,
+                "station_id": "$_id.station_id",
+                "name": "$_id.name",
+                "geometry": "$_id.geometry",
+                "altitude": "$_id.altitude",
+                "address": "$_id.address",
+                "post_code": "$_id.post_code",
+                "avg_monthly_count": 1,
+                "months_count": 1
+            }
+        },
+
+        # Sort by average monthly count in descending order
+        {"$sort": {"avg_monthly_count": -1}},
+
+        # Limit to top 10 results
+        {"$limit": 10}
     ]
 
     # Aggregation for num_docks_available = 0
     pipeline_docks = [
+        # Unwind the status array
         {"$unwind": "$status"},
+
+        # Match documents where num_docks_available is 0
         {"$match": {"status.num_docks_available": 0}},
+
+        # Group by station, year, and month
         {
             "$group": {
                 "_id": {
@@ -71,7 +113,44 @@ def find_top_stations():
                 "address": {"$first": "$address"},
                 "post_code": {"$first": "$post_code"}
             }
-        }
+        },
+
+        # Group by station to calculate average monthly count
+        {
+            "$group": {
+                "_id": {
+                    "station_id": "$_id.station_id",
+                    "name": "$name",
+                    "geometry": "$geometry",
+                    "altitude": "$altitude",
+                    "address": "$address",
+                    "post_code": "$post_code"
+                },
+                "avg_monthly_count": {"$avg": "$count"},
+                "months_count": {"$sum": 1}  # Count of months with data
+            }
+        },
+
+        # Project final output
+        {
+            "$project": {
+                "_id": 0,
+                "station_id": "$_id.station_id",
+                "name": "$_id.name",
+                "geometry": "$_id.geometry",
+                "altitude": "$_id.altitude",
+                "address": "$_id.address",
+                "post_code": "$_id.post_code",
+                "avg_monthly_count": 1,
+                "months_count": 1
+            }
+        },
+
+        # Sort by average monthly count in descending order
+        {"$sort": {"avg_monthly_count": -1}},
+
+        # Limit to top 10 results
+        {"$limit": 10}
     ]
 
     # MongoDB aggregation pipeline
@@ -79,79 +158,97 @@ def find_top_stations():
         # Unwind the status array
         {"$unwind": "$status"},
 
-        # Group by station, date, and hour to calculate hourly changes
+        # Group by station and date to calculate daily rotation
         {
             "$group": {
                 "_id": {
                     "station_id": "$station_id",
                     "date": "$date",
-                    "hour": "$status.hour"
+                    "name": "$name",
+                    "geometry": "$geometry",
+                    "altitude": "$altitude",
+                    "address": "$address",
+                    "post_code": "$post_code"
                 },
-                "bikes_change": {"$max": {"$abs": "$status.num_bikes_available"}},
-                "name": {"$first": "$name"},
-                "geometry": {"$first": "$geometry"},
-                "altitude": {"$first": "$altitude"},
-                "address": {"$first": "$address"},
-                "post_code": {"$first": "$post_code"}
+                "hourlyData": {
+                    "$push": {
+                        "hour": "$status.hour",
+                        "bikes": "$status.num_bikes_available"
+                    }
+                }
             }
         },
 
-        # Group by station and date to calculate daily rotation
-        {
-            "$group": {
-                "_id": {
-                    "station_id": "$_id.station_id",
-                    "date": "$_id.date"
-                },
-                "daily_rotation": {"$sum": "$bikes_change"},
-                "name": {"$first": "$name"},
-                "geometry": {"$first": "$geometry"},
-                "altitude": {"$first": "$altitude"},
-                "address": {"$first": "$address"},
-                "post_code": {"$first": "$post_code"}
-            }
-        },
-
-        # Group by station, year, and month
-        {
-            "$group": {
-                "_id": {
-                    "station_id": "$_id.station_id",
-                    "year": {"$year": "$_id.date"},
-                    "month": {"$month": "$_id.date"}
-                },
-                "count": {"$sum": 1},
-                "total_rotation": {"$sum": "$daily_rotation"},
-                "name": {"$first": "$name"},
-                "geometry": {"$first": "$geometry"},
-                "altitude": {"$first": "$altitude"},
-                "address": {"$first": "$address"},
-                "post_code": {"$first": "$post_code"}
-            }
-        },
-
-        # Calculate average daily rotation
+        # Calculate daily rotation
         {
             "$project": {
+                "_id": 0,
+                "station_id": "$_id.station_id",
+                "date": "$_id.date",
+                "name": "$_id.name",
+                "geometry": "$_id.geometry",
+                "altitude": "$_id.altitude",
+                "address": "$_id.address",
+                "post_code": "$_id.post_code",
+                "dailyRotation": {
+                    "$reduce": {
+                        "input": {"$range": [1, 24]},
+                        "initialValue": 0,
+                        "in": {
+                            "$add": [
+                                "$$value",
+                                {
+                                    "$abs": {
+                                        "$subtract": [
+                                            {"$arrayElemAt": ["$hourlyData.bikes", "$$this"]},
+                                            {"$arrayElemAt": ["$hourlyData.bikes", {"$subtract": ["$$this", 1]}]}
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+
+        # Group by station to calculate average daily rotation
+        {
+            "$group": {
+                "_id": {
+                    "station_id": "$station_id",
+                    "name": "$name",
+                    "geometry": "$geometry",
+                    "altitude": "$altitude",
+                    "address": "$address",
+                    "post_code": "$post_code"
+                },
+                "total_rotation": {"$sum": "$dailyRotation"},
+                "count": {"$sum": 1}
+            }
+        },
+
+        # Project final output
+        {
+            "$project": {
+                "_id": 0,
+                "station_id": "$_id.station_id",
+                "name": "$_id.name",
+                "geometry": "$_id.geometry",
+                "altitude": "$_id.altitude",
+                "address": "$_id.address",
+                "post_code": "$_id.post_code",
                 "count": 1,
-                "name": 1,
-                "geometry": 1,
-                "altitude": 1,
-                "address": 1,
-                "post_code": 1,
                 "avg_daily_rotation": {"$divide": ["$total_rotation", "$count"]}
             }
         },
 
-        # Sort by year, month, and average daily rotation (descending)
-        {
-            "$sort": SON([
-                ("_id.year", 1),
-                ("_id.month", 1),
-                ("avg_daily_rotation", -1)
-            ])
-        }
+        # Sort by average daily rotation in descending order
+        {"$sort": {"avg_daily_rotation": -1}},
+        # Limit to top 10 results
+        {"$limit": 10}
     ]
+
 
     # Execute the aggregation query with allowDiskUse=True
     results_high = list(collection.aggregate(pipeline_high_rotation, allowDiskUse=True))
@@ -168,70 +265,40 @@ def find_top_stations():
     df_high = pd.DataFrame(results_high)
 
     # Flatten the '_id' field into separate columns for DataFrames
-    df_bikes[['station_id', 'year', 'month']] = pd.json_normalize(df_bikes['_id'])
-    df_docks[['station_id', 'year', 'month']] = pd.json_normalize(df_docks['_id'])
-    df_high[['station_id', 'year', 'month']] = pd.json_normalize(df_high['_id'])
+    #df_bikes[['station_id', 'year', 'month']] = pd.json_normalize(df_bikes['_id'])
+    #df_docks[['station_id', 'year', 'month']] = pd.json_normalize(df_docks['_id'])
+    #df_high[['station_id', 'year', 'month']] = pd.json_normalize(df_high['_id'])
 
-    # Drop the '_id' field
-    df_bikes.drop(columns=['_id'], inplace=True)
-    df_docks.drop(columns=['_id'], inplace=True)
-    df_high.drop(columns=['_id','count'], inplace=True)
-    df_high.rename(columns={'avg_daily_rotation': 'count'}, inplace=True)
+    final_bikes = df_bikes[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
+    final_docks = df_docks[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
+    final_high = df_high[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
 
-    # Get top 10 stations for bikes and docks
-    top_10_bikes = get_top_10_stations(df_bikes)
-    top_10_docks = get_top_10_stations(df_docks)
-    top_10_high = get_top_10_stations(df_high)
+    print(final_bikes)
 
-    ## Create a DataFrame to count occurrences of each station_id in the top 10 across years
-    #years_bikes = top_10_bikes.groupby('station_id')['year'].apply(list).reset_index(name='years')
-    #years_docks = top_10_docks.groupby('station_id')['year'].apply(list).reset_index(name='years')
-    #years_high = top_10_high.groupby('station_id')['year'].apply(list).reset_index(name='years')
+    #final_bikes['geometry'] = final_bikes['geometry'].apply(geometry_to_string)
+    #final_docks['geometry'] = final_docks['geometry'].apply(geometry_to_string)
+    #final_high['geometry'] = final_high['geometry'].apply(geometry_to_string)
 #
-    ## Count the number of years each station appears in the top 10
-    #years_bikes['year_count'] = years_bikes['years'].apply(len)
-    #years_docks['year_count'] = years_docks['years'].apply(len)
-    #years_high['year_count'] = years_high['years'].apply(len)
+    ## Drop duplicates
+    #final_bikes = final_bikes.drop_duplicates()
+    #final_docks = final_docks.drop_duplicates()
+    #final_high = final_high.drop_duplicates()
 #
-    ## Filter stations that appear in the top 10 for at least 2 years
-    #years_bikes_filtered = years_bikes[years_bikes['year_count'] >= 2]
-    #years_docks_filtered = years_docks[years_docks['year_count'] >= 2]
-    #years_high_filtered = years_high[years_high['year_count'] >= 2]
-#
-    #final_bikes = df_bikes[df_bikes['station_id'].isin(years_bikes_filtered['station_id'])]
-    #final_docks = df_docks[df_docks['station_id'].isin(years_docks_filtered['station_id'])]
-    #final_high = df_high[df_high['station_id'].isin(years_high_filtered['station_id'])]
-
-    final_bikes = df_bikes[df_bikes['station_id'].isin(top_10_bikes['station_id'])]
-    final_docks = df_docks[df_docks['station_id'].isin(top_10_docks['station_id'])]
-    final_high = df_high[df_high['station_id'].isin(top_10_high['station_id'])]
-
-    final_bikes = final_bikes[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
-    final_docks = final_docks[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
-    final_high = final_high[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
-
-    final_bikes['geometry'] = final_bikes['geometry'].apply(geometry_to_string)
-    final_docks['geometry'] = final_docks['geometry'].apply(geometry_to_string)
-    final_high['geometry'] = final_high['geometry'].apply(geometry_to_string)
-
-    # Drop duplicates
-    final_bikes = final_bikes.drop_duplicates()
-    final_docks = final_docks.drop_duplicates()
-    final_high = final_high.drop_duplicates()
-
-    # Convert geometry back to original format
-    final_bikes['geometry'] = final_bikes['geometry'].apply(string_to_geometry)
+    # For final_bikes
+    final_bikes = final_bikes.copy()
     final_bikes['reason'] = "No Bikes"
-    final_docks['geometry'] = final_docks['geometry'].apply(string_to_geometry)
+
+    # For final_docks
+    final_docks = final_docks.copy()
     final_docks['reason'] = "No Docks"
-    final_high['geometry'] = final_high['geometry'].apply(string_to_geometry)
+
+    # For final_high
+    final_high = final_high.copy()
     final_high['reason'] = "High Rotation"
-    # Add the years column to final DataFrames
-    #final_bikes = final_bikes.merge(years_bikes_filtered[['station_id', 'years']], on='station_id', how='left')
-    #final_docks = final_docks.merge(years_docks_filtered[['station_id', 'years']], on='station_id', how='left')
-    #final_high = final_high.merge(years_docks_filtered[['station_id', 'years']], on='station_id', how='left')
 
     merged_df = pd.concat([final_bikes,final_docks,final_high], ignore_index=True)
+
+    print(merged_df)
 
     # Merge DataFrames and keep all initial fields
     final_df = merged_df.groupby('station_id', as_index=False).agg({
@@ -243,6 +310,7 @@ def find_top_stations():
         'post_code': 'first'  # Get first occurrence of post_code
     })
 
+    print(final_df)
 
     top_collection = db['top_stations']
 
@@ -262,8 +330,6 @@ def find_top_stations():
     print(f"Added Is_popular field to {result.modified_count} documents")
 
     # Step 2: Update Is_popular to "Yes" for stations in the DataFrame
-    # Assuming you have a DataFrame named 'popular_stations' with a column 'station_id'
-
     update_count = 0
     for station_id in final_df['station_id']:
         result = collection_update.update_one(

@@ -2,14 +2,8 @@
 import folium
 from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
-from pymongo import MongoClient
 import pandas as pd
-from shapely.geometry import shape, mapping
-import geopandas as gpd
 from utilities import doc_to_gdf, filter_estacio_to_gdf
-from top_stations import find_top_stations
-from expansion_analysis import get_similar_stations
-
 
 def get_potential_stations_summary(potential_stations, neighborhood_geometry=None):
     """Calculate summary statistics for potential stations, optionally filtered by neighborhood"""
@@ -351,7 +345,6 @@ def main():
         # Load all required data
         gdf_top_stations, top_stations_error = doc_to_gdf('top_stations',
                                                           fields=['name', 'station_id', 'geometry', 'reason'])
-
         if top_stations_error:
             st.error(f"Error loading top stations: {top_stations_error}")
             return
@@ -370,10 +363,12 @@ def main():
                                                                  'dist_metro_stations', 'dist_bike_lanes',
                                                                  'dist_popular', 'dist_bike_station',
                                                                  'similarity_score', 'cluster'])
+
         if potential_error:
             st.error(f"Error loading potential stations: {potential_error}")
 
         gdf_stations, stations_error = filter_estacio_to_gdf(gdf_top_stations)
+        st.write("ok filter")
         if stations_error:
             st.error(f"Error loading stations: {stations_error}")
 
