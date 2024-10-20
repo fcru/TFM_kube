@@ -130,7 +130,7 @@ def validar_ficheros_por_fecha():
 
     for year in years:
         for mes in range(1,13):
-            if year == 2024 and mes > 7:
+            if year == 2024 and mes > 9:
                 break
 
             estat_path = f"hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/estat/{year}/{str(mes).zfill(2)}"

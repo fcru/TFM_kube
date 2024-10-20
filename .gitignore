@@ -2,3 +2,6 @@
 .venv
 *.pyc
 pipelines-batch/data
+visualizacion_demanda/data/*.csv
+visualizacion_demanda/data/predicts/returned/*.csv
+visualizacion_demanda/data/predicts/taken/*.csv
