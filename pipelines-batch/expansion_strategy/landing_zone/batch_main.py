@@ -28,7 +28,7 @@ while op != 0:
         type_api = "estat_estacio"
         batch_bicing_download(url, type_api)
     elif op == 3:
-        url = "https://api.tmb.cat/v1/transit/linies/bus"
+        url = "https://api.tmb.cat/clusterv1/transit/linies/bus"
         download_API_data(url,'bus_lines.json', "TMB")
         time.sleep(5)
         url = "https://api.tmb.cat/v1/transit/linies/metro"

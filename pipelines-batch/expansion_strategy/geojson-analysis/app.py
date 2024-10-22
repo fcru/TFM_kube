@@ -2,17 +2,12 @@
 import folium
 from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
-from pymongo import MongoClient
 import pandas as pd
-from shapely.geometry import shape, mapping
-import geopandas as gpd
 from utilities import doc_to_gdf, filter_estacio_to_gdf
-from top_stations import find_top_stations
-from expansion_analysis import get_similar_stations
 
 
-def get_potential_stations_summary(potential_stations, neighborhood_geometry=None):
-    """Calculate summary statistics for potential stations, optionally filtered by neighborhood"""
+def get_potential_stations_summary(potential_stations, gdf_top_stations,gdf_no_bikes, gdf_no_docks, gdf_high, neighborhood_geometry=None):
+    """Calculate summary statistics for potential stations and top stations, optionally filtered by neighborhood"""
     if potential_stations is None or potential_stations.empty:
         return None
 
@@ -21,7 +16,10 @@ def get_potential_stations_summary(potential_stations, neighborhood_geometry=Non
 
     # If neighborhood geometry is provided, filter stations within that neighborhood
     if neighborhood_geometry is not None:
-        valid_stations = valid_stations[valid_stations.geometry.within(neighborhood_geometry)]
+        valid_stations = valid_stations[valid_stations.geometry.intersects(neighborhood_geometry)]
+        top_stations_filtered = gdf_top_stations[gdf_top_stations.geometry.intersects(neighborhood_geometry)]
+    else:
+        top_stations_filtered = gdf_top_stations
 
     if valid_stations.empty:
         return None
@@ -44,8 +42,22 @@ def get_potential_stations_summary(potential_stations, neighborhood_geometry=Non
     }
 
     for label, col in distance_metrics.items():
-        if col in valid_stations.columns:
-            summary['Average Distances'][label] = valid_stations[col].mean()
+        if col in valid_stations.columns and col in top_stations_filtered.columns:
+            proposed_mean = valid_stations[col].mean() if isinstance(valid_stations[col], pd.Series) else \
+            valid_stations[col]
+            top_mean = top_stations_filtered[col].mean() if isinstance(top_stations_filtered[col], pd.Series) else \
+            top_stations_filtered[col]
+            no_bikes_mean = gdf_no_bikes[col].mean()
+            no_docks_mean = gdf_no_docks[col].mean()
+            high_rotation_mean = gdf_high[col].mean()
+
+            summary['Average Distances'][label] = {
+                'Proposed': proposed_mean,
+                'Top Stations': top_mean,
+                'No Bikes': no_bikes_mean,
+                'No Docks': no_docks_mean,
+                'High Rotation': high_rotation_mean
+            }
 
     return summary
 
@@ -53,11 +65,12 @@ def get_potential_stations_summary(potential_stations, neighborhood_geometry=Non
 def get_color_by_density(density):
     """Return color based on density classification"""
     colors = {
-        'very_high': '#9A051F',
-        'high': '#ff0000',
-        'medium': '#ffaa00',
-        'low': '#ffff00'
+        'very_high': '#6a51a3',
+        'high': '#9e9ac8',
+        'medium': '#cbc9e2',
+        'low': '#f2f0f7'
     }
+
     return colors.get(density, '#808080')
 
 
@@ -111,7 +124,8 @@ def filter_neighborhoods_by_density(gdf, density_thresholds):
 
 
 def create_map(gdf_stations, gdf_no_bikes, gdf_no_docks, gdf_high, potential_stations,
-               gdf_density, visible_layers, density_thresholds):
+               gdf_density, gdf_bike_lanes, gdf_metro_lines, gdf_bus_lines,
+               visible_layers, density_thresholds):
     """Create Folium map with selectable layers"""
     m = folium.Map(location=[41.3851, 2.1734], zoom_start=12)
 
@@ -156,6 +170,32 @@ def create_map(gdf_stations, gdf_no_bikes, gdf_no_docks, gdf_high, potential_sta
          'green', 'Potential Station', 'potential')
     ]
 
+    if 'bike_lanes' in visible_layers and gdf_bike_lanes is not None:
+        folium.GeoJson(
+            gdf_bike_lanes,
+            name="Bike Lanes",
+            style_function=lambda x: {'color': 'green', 'weight': 2},
+            tooltip=folium.GeoJsonTooltip(fields=['name'], aliases=['Bike Lane:'], labels=True)
+        ).add_to(m)
+
+        # Add metro lines
+    if 'metro_lines' in visible_layers and gdf_metro_lines is not None:
+        folium.GeoJson(
+            gdf_metro_lines,
+            name="Metro Lines",
+            style_function=lambda x: {'color': 'red', 'weight': 3},
+            tooltip=folium.GeoJsonTooltip(fields=['name'], aliases=['Metro Line:'], labels=True)
+        ).add_to(m)
+
+        # Add bus lines
+    if 'bus_lines' in visible_layers and gdf_bus_lines is not None:
+        folium.GeoJson(
+            gdf_bus_lines,
+            name="Bus Lines",
+            style_function=lambda x: {'color': 'blue', 'weight': 2},
+            tooltip=folium.GeoJsonTooltip(fields=['name'], aliases=['Bus Line:'], labels=True)
+        ).add_to(m)
+
     for gdf, color, station_type, layer_name in marker_configs:
         if gdf is not None and layer_name in visible_layers:
             for _, row in gdf.iterrows():
@@ -186,7 +226,6 @@ def create_map(gdf_stations, gdf_no_bikes, gdf_no_docks, gdf_high, potential_sta
 
     return m
 
-
 def add_legend(m):
     """Add a comprehensive legend to the map"""
     legend_html = '''
@@ -202,19 +241,19 @@ def add_legend(m):
             <strong>Density Levels</strong>
             <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 5px;">
                 <div style="display: flex; align-items: center;">
-                    <div style="background-color: #9A051F; width: 20px; height: 20px; margin-right: 5px;"></div>
+                    <div style="background-color: #6a51a3; width: 20px; height: 20px; margin-right: 5px;"></div>
                     <span>Very High</span>
                 </div>
                 <div style="display: flex; align-items: center;">
-                    <div style="background-color: #ff0000; width: 20px; height: 20px; margin-right: 5px;"></div>
+                    <div style="background-color: #9e9ac8; width: 20px; height: 20px; margin-right: 5px;"></div>
                     <span>High</span>
                 </div>
                 <div style="display: flex; align-items: center;">
-                    <div style="background-color: #ffaa00; width: 20px; height: 20px; margin-right: 5px;"></div>
+                    <div style="background-color: #cbc9e2; width: 20px; height: 20px; margin-right: 5px;"></div>
                     <span>Medium</span>
                 </div>
                 <div style="display: flex; align-items: center;">
-                    <div style="background-color: #ffff00; width: 20px; height: 20px; margin-right: 5px;"></div>
+                    <div style="background-color: #f2f0f7; width: 20px; height: 20px; margin-right: 5px;"></div>
                     <span>Low</span>
                 </div>
             </div>
@@ -230,9 +269,19 @@ def add_legend(m):
                 <div><span style="color: blue;">●</span> Regular</div>
             </div>
         </div>
+        <hr>
+         <div style="margin-top: 10px;">
+            <strong>Transportation</strong>
+            <div style="display: flex; flex-direction: column; gap: 5px; margin-top: 5px;">
+                <div><span style="color: green;">—</span> Bike Lanes</div>
+                <div><span style="color: red;">—</span> Metro Lines</div>
+                <div><span style="color: blue;">—</span> Bus Lines</div>
+            </div>
+        </div>
     </div>
     '''
     m.get_root().html.add_child(folium.Element(legend_html))
+
 
 def get_safe_columns(df, desired_columns):
     """Return only the columns that exist in the DataFrame"""
@@ -309,6 +358,7 @@ def display_neighborhood_data(gdf_density, neighborhood_name, all_stations):
         except Exception as e:
             st.error(f"An error occurred while processing the data: {str(e)}")
 
+
 def display_summary_metrics(summary, title):
     """Display summary metrics in a consistent format"""
     if summary:
@@ -316,15 +366,22 @@ def display_summary_metrics(summary, title):
         st.write(f"Total Proposed Stations: {summary['Total Proposed Stations']}")
 
         st.write("Average Distances:")
-        metrics_df = pd.DataFrame(
-            list(summary['Average Distances'].items()),
-            columns=['Metric', 'Value']
-        )
-        metrics_df['Value'] = metrics_df['Value'].round(2)
+        metrics_data = []
+        for metric, values in summary['Average Distances'].items():
+            metrics_data.append({
+                'Metric': metric,
+                'Proposed Stations': round(values['Proposed'], 2) if pd.notna(values['Proposed']) else 'N/A',
+                'Top Stations': round(values['Top Stations'], 2) if pd.notna(values['Top Stations']) else 'N/A',
+                'No Bikes': round(values['No Bikes'], 2) if pd.notna(values['No Bikes']) else 'N/A',
+                'No Docks': round(values['No Docks'], 2) if pd.notna(values['No Docks']) else 'N/A',
+                'High Rotation': round(values['High Rotation'], 2) if pd.notna(values['High Rotation']) else 'N/A'
+            })
+
+        metrics_df = pd.DataFrame(metrics_data)
         st.dataframe(metrics_df, hide_index=True)
+
     else:
         st.warning(f"No data available for {title}")
-
 
 def create_layout():
     """Create the main layout with two columns"""
@@ -350,8 +407,10 @@ def main():
     try:
         # Load all required data
         gdf_top_stations, top_stations_error = doc_to_gdf('top_stations',
-                                                          fields=['name', 'station_id', 'geometry', 'reason'])
-
+                                                          fields=['name', 'station_id', 'geometry', 'reason','dist_education',
+                                                                 'dist_shopping', 'dist_cpoi', 'dist_bus_stops',
+                                                                 'dist_metro_stations', 'dist_bike_lanes',
+                                                                 'dist_popular', 'dist_bike_station'])
         if top_stations_error:
             st.error(f"Error loading top stations: {top_stations_error}")
             return
@@ -370,8 +429,21 @@ def main():
                                                                  'dist_metro_stations', 'dist_bike_lanes',
                                                                  'dist_popular', 'dist_bike_station',
                                                                  'similarity_score', 'cluster'])
+
         if potential_error:
             st.error(f"Error loading potential stations: {potential_error}")
+
+        gdf_bike_lanes, bike_lanes_error = doc_to_gdf('bcn_bike_lanes', fields=['name', 'geometry'])
+        if bike_lanes_error:
+            st.error(f"Error loading bike lanes: {bike_lanes_error}")
+
+        gdf_metro_lines, metro_lines_error = doc_to_gdf('metro_lines', fields=['name', 'geometry'])
+        if metro_lines_error:
+            st.error(f"Error loading metro lines: {metro_lines_error}")
+
+        gdf_bus_lines, bus_lines_error = doc_to_gdf('bus_lines', fields=['name', 'geometry'])
+        if bus_lines_error:
+            st.error(f"Error loading bus lines: {bus_lines_error}")
 
         gdf_stations, stations_error = filter_estacio_to_gdf(gdf_top_stations)
         if stations_error:
@@ -422,6 +494,16 @@ def main():
                             if st.checkbox(label, True):
                                 temp_visible_layers.append(key)
 
+                        st.subheader("Transportation Layers")
+                        transport_types = {
+                            'bike_lanes': "Bike Lanes",
+                            'metro_lines': "Metro Lines",
+                            'bus_lines': "Bus Lines"
+                        }
+                        for key, label in transport_types.items():
+                            if st.checkbox(label, False):
+                                temp_visible_layers.append(key)
+
                     # Density filters
                     st.subheader("Density Filters")
                     temp_density_thresholds = {}
@@ -446,54 +528,53 @@ def main():
             m = create_map(
                 gdf_stations, gdf_no_bikes, gdf_no_docks, gdf_high,
                 potential_stations, gdf_density,
+                gdf_bike_lanes, gdf_metro_lines, gdf_bus_lines,
                 st.session_state.visible_layers,
                 st.session_state.density_thresholds
             )
             folium_static(m)
 
-        # Statistics Tab
         with stats_tab:
-                col1, col2 = st.columns(2)
+            # First row: Global Statistics
+            st.header("Station & Neighborhood Statistics")
+            global_summary = get_potential_stations_summary(potential_stations, gdf_top_stations, gdf_no_bikes, gdf_no_docks, gdf_high)
+            display_summary_metrics(global_summary, "Global Statistics")
+            # Add separator
+            st.markdown("---")
+            st.markdown("<br>", unsafe_allow_html=True)
+            # Second row: Neighborhood Information
+            st.header("Neighborhood Information")
+            if gdf_density is not None and 'name' in gdf_density.columns:
+                selected_neighborhood = st.selectbox(
+                    "Select a neighborhood:",
+                    options=[''] + sorted(gdf_density['name'].unique().tolist())
+                )
 
-                with col1:
-                    # Global Statistics
-                    global_summary = get_potential_stations_summary(potential_stations)
-                    display_summary_metrics(global_summary, "Global Statistics")
+                if selected_neighborhood:
+                    neighborhood = gdf_density[gdf_density['name'] == selected_neighborhood].iloc[0]
 
-                with col2:
-                    # Neighborhood Selection and Statistics
-                    st.subheader("Neighborhood Information")
-                    if gdf_density is not None and 'name' in gdf_density.columns:
-                        selected_neighborhood = st.selectbox(
-                            "Select a neighborhood:",
-                            options=[''] + sorted(gdf_density['name'].unique().tolist())
-                        )
+                    # Calculate and display neighborhood-specific statistics
+                    neighborhood_summary = get_potential_stations_summary(potential_stations, gdf_top_stations, gdf_no_bikes, gdf_no_docks, gdf_high,
+                                                                          neighborhood.geometry)
+                    display_summary_metrics(neighborhood_summary, f"Statistics for {selected_neighborhood}")
 
-                        if selected_neighborhood:
-                            neighborhood = gdf_density[gdf_density['name'] == selected_neighborhood].iloc[0]
+                    # Display density information
+                    st.subheader("Density Information")
+                    density_cols = ['commercial_density', 'school_density', 'poi_density']
+                    density_data = []
+                    for col in density_cols:
+                        if col in neighborhood:
+                            density_info = neighborhood[col]
+                            density_data.append({
+                                'Type': col.replace('_density', '').title(),
+                                'Level': density_info['classification'],
+                                'Count': density_info['count']
+                            })
 
-                            # Calculate and display neighborhood-specific statistics
-                            neighborhood_summary = get_potential_stations_summary(potential_stations,
-                                                                                  neighborhood.geometry)
-                            display_summary_metrics(neighborhood_summary, f"Statistics for {selected_neighborhood}")
-
-                            # Display density information
-                            st.subheader("Density Information")
-                            density_cols = ['commercial_density', 'school_density', 'poi_density']
-                            density_data = []
-                            for col in density_cols:
-                                if col in neighborhood:
-                                    density_info = neighborhood[col]
-                                    density_data.append({
-                                        'Type': col.replace('_density', '').title(),
-                                        'Level': density_info['classification'],
-                                        'Count': density_info['count']
-                                    })
-
-                            if density_data:
-                                st.dataframe(pd.DataFrame(density_data), hide_index=True)
-                    else:
-                        st.warning("Neighborhood data is not available")
+                    if density_data:
+                        st.dataframe(pd.DataFrame(density_data), hide_index=True)
+            else:
+                st.warning("Neighborhood data is not available")
 
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
