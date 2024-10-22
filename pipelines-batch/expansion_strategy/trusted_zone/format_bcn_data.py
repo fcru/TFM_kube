@@ -1,12 +1,29 @@
 import os
 import sys
 import time
-
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilities import *
+
+
+def calculate_null_percentages(df):
+    """Calculate percentage of null values for each column in the DataFrame."""
+    total_rows = df.count()
+    if total_rows == 0:
+        return None
+
+    null_counts = []
+    for column in df.columns:
+        null_count = df.filter(F.col(column).isNull()).count()
+        percentage = (null_count / total_rows) * 100
+        null_counts.append((column, percentage))
+
+    print("\nNull Value Percentages:")
+    for column, percentage in null_counts:
+        print(f"{column}: {percentage:.2f}%")
+    return null_counts
 
 def format_bcn_data(output_base_dir,hdfs_path):
     # Initialize Spark session
@@ -26,6 +43,8 @@ def format_bcn_data(output_base_dir,hdfs_path):
         file_name = os.path.basename(file)
         df = spark.read.parquet(file)
         print(f"Precessing {file_name} ...")
+        print("Original DataFrame null percentages:")
+        calculate_null_percentages(df)
 
         if file_name == "Large_shopping_centers.json" or file_name == "cultural_points_of_interests.json" or file_name == "educative_centers.json":
             category= os.path.splitext(file_name)[0]
@@ -105,6 +124,9 @@ def format_bcn_data(output_base_dir,hdfs_path):
             df_final = df
             df.printSchema()
 
+        print("\nProcessed DataFrame null percentages:")
+        calculate_null_percentages(df_final)
+
         final_path = f"{output_base_dir}/{file_name}"
         df_final.write.mode("overwrite").parquet(final_path)
         df_final.show()
@@ -113,10 +135,10 @@ def format_bcn_data(output_base_dir,hdfs_path):
 
 
 if __name__ == "__main__":
-    output_base_TMB = "hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/TMB"
+    output_base_TMB = "hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/TMB"
     hdfs_path = f"/landing-zone/batch/TMB/"
     format_bcn_data(output_base_TMB, hdfs_path)
 
-    output_base_bcn = "hdfs://hadooop-hadoop-hdfs-nn:9000/formatted-zone/bcn_data"
+    output_base_bcn = "hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/bcn_data"
     hdfs_path = f"/landing-zone/batch/bcn_data/"
     format_bcn_data(output_base_bcn, hdfs_path)

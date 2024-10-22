@@ -271,7 +271,8 @@ def get_similar_stations(projected=True):
     potential_points_features = potential_points[features]
     classified_points = best_model_object.predict(potential_points_features)
     new_stations = potential_points[classified_points == 1]
-    new_stations = new_stations.to_crs("EPSG:4326")
+    new_stations = new_stations.copy()
+    new_stations['geometry'] = new_stations['geometry'].to_crs("EPSG:4326")
 
     print(f"Number of proposed new stations: {len(new_stations)}")
     print("\nTop 5 proposed locations:")

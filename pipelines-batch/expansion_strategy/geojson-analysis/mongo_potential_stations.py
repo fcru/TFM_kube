@@ -95,6 +95,33 @@ def save_stations_to_mongodb(new_stations):
     client.close()
 
 
+def update_top_stations_with_distances(gdf_top_stations):
+
+    # Connect to MongoDB
+    client = MongoClient('mongodb://mongodb:27017/')
+    db = client['bicing_db']
+    collection = db['top_stations']
+
+    # Update each document in the collection
+    for index, row in gdf_top_stations.iterrows():
+        station_id = row['station_id']
+        update_data = {
+            'dist_education': float(row['dist_education']),
+            'dist_shopping': float(row['dist_shopping']),
+            'dist_cpoi': float(row['dist_cpoi']),
+            'dist_bus_stops': float(row['dist_bus_stops']),
+            'dist_metro_stations': float(row['dist_metro_stations']),
+            'dist_bike_lanes': float(row['dist_bike_lanes']),
+            'dist_popular': float(row['dist_popular']),
+            'dist_bike_station': float(row['dist_bike_station'])
+        }
+
+        collection.update_one({'station_id': station_id}, {'$set': update_data})
+
+    print(f"Updated {len(gdf_top_stations)} documents in the top_stations collection")
+
+    client.close()
+
 def get_similar_stations(projected=True):
     # Load data
     gdf_top_stations, top_stations_error = doc_to_gdf('top_stations',
@@ -117,9 +144,8 @@ def get_similar_stations(projected=True):
         gdf_stations = gdf_stations.to_crs(crs)
         gdf_top_stations = gdf_top_stations.to_crs(crs)
         step_size = 10
-        min_distance_top = 200
-        min_distance_all = 200
-        eps = 50
+        min_distance_st = 200
+        max_distance_bike= 60
     else:
         step_size = 0.002
         crs = "EPSG:4326"
@@ -154,10 +180,9 @@ def get_similar_stations(projected=True):
     gdf_top_stations['dist_popular'] = nearest_dist(gdf_top_stations, gdf_top_stations)
     gdf_top_stations['dist_bike_station'] = nearest_dist(gdf_top_stations, gdf_stations)
 
-    ## Interpolate altitude for potential points
-    #known_points = np.array(list(gdf_stations.geometry.apply(lambda x: (x.x, x.y))))
-    #known_altitudes = np.array(gdf_stations['altitude'])
-
+    update_top_stations_with_distances(gdf_top_stations)
+    print("Top Stations")
+    print(gdf_top_stations.describe())
     # Create a grid of potential locations
     xmin, ymin, xmax, ymax = other_layers['Neighbourhoods'].total_bounds
     x = np.arange(xmin, xmax, step_size)
@@ -191,8 +216,10 @@ def get_similar_stations(projected=True):
                 'dist_metro_stations', 'dist_popular', 'dist_bike_station']
 
     # Filter out points too close to existing popular stations
-    potential_points_within = potential_points_within[potential_points_within['dist_popular'] > min_distance_top]
-    potential_points_within = potential_points_within[potential_points_within['dist_bike_station'] > min_distance_all]
+    potential_points_within = potential_points_within[potential_points_within['dist_popular'] > min_distance_st]
+    potential_points_within = potential_points_within[potential_points_within['dist_bike_station'] > min_distance_st]
+    potential_points_within = potential_points_within[potential_points_within['dist_bike_lanes'] < max_distance_bike]
+
 
     # Normalize features
     scaler = StandardScaler()
@@ -254,5 +281,3 @@ def get_similar_stations(projected=True):
 
 if __name__ == "__main__":
     get_similar_stations()
-
-    # Añadir mantenimiento corto, medio, largo plazo

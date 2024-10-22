@@ -92,9 +92,9 @@ def calculate_classifications(
     geometry_field: str = 'geometry',
     name_field: str = 'name',
     classification_field: str = 'density_classification',
-    low_threshold_percentile: float = 0.25,
-    high_threshold_percentile: float = 0.60,
-    very_high_threshold_percentile: float = 0.75
+    low_threshold_percentage: float = 0.25,
+    high_threshold_percentage: float = 0.60,
+    very_high_threshold_percentage: float = 0.75
 ) -> None:
     """Calculate and update point density classifications"""
     print("Calculating classifications...")
@@ -120,9 +120,9 @@ def calculate_classifications(
     if containers_data:
         # Sort counts to calculate thresholds
         counts = sorted(n['count'] for n in containers_data)
-        low_threshold = counts[int(len(counts) * low_threshold_percentile)]
-        high_threshold = counts[int(len(counts) * high_threshold_percentile)]
-        very_high_threshold = counts[int(len(counts) * very_high_threshold_percentile)]
+        low_threshold = counts[int(len(counts) * low_threshold_percentage)]
+        high_threshold = counts[int(len(counts) * high_threshold_percentage)]
+        very_high_threshold = counts[int(len(counts) * very_high_threshold_percentage)]
 
         print(f"\nClassification thresholds:")
         print(f"Low: {low_threshold} points")

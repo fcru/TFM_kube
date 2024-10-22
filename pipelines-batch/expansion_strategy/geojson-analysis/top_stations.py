@@ -264,26 +264,12 @@ def find_top_stations():
     df_docks = pd.DataFrame(results_docks)
     df_high = pd.DataFrame(results_high)
 
-    # Flatten the '_id' field into separate columns for DataFrames
-    #df_bikes[['station_id', 'year', 'month']] = pd.json_normalize(df_bikes['_id'])
-    #df_docks[['station_id', 'year', 'month']] = pd.json_normalize(df_docks['_id'])
-    #df_high[['station_id', 'year', 'month']] = pd.json_normalize(df_high['_id'])
-
     final_bikes = df_bikes[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
     final_docks = df_docks[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
     final_high = df_high[['station_id', 'name', 'geometry', 'altitude', 'address', 'post_code']]
 
     print(final_bikes)
 
-    #final_bikes['geometry'] = final_bikes['geometry'].apply(geometry_to_string)
-    #final_docks['geometry'] = final_docks['geometry'].apply(geometry_to_string)
-    #final_high['geometry'] = final_high['geometry'].apply(geometry_to_string)
-#
-    ## Drop duplicates
-    #final_bikes = final_bikes.drop_duplicates()
-    #final_docks = final_docks.drop_duplicates()
-    #final_high = final_high.drop_duplicates()
-#
     # For final_bikes
     final_bikes = final_bikes.copy()
     final_bikes['reason'] = "No Bikes"
