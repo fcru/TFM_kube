@@ -14,3 +14,6 @@ data:
       - job_name: 'kafka'
         static_configs:
           - targets: ['kafka-jmx-metrics:5556']
+      - job_name: 'update_status'
+        static_configs:
+          - targets: ['update-status-service:8000']

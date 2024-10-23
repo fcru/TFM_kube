@@ -25,7 +25,7 @@ producer = KafkaProducer(
     security_protocol='SASL_PLAINTEXT',  # Protocolo de seguridad
     sasl_mechanism='PLAIN',              # Mecanismo de SASL
     sasl_plain_username='user1',         # Usuario SASL (mismo que en jaas.conf)
-    sasl_plain_password='tiSmu50tsg',    # Contraseña SASL (mismo que en jaas.conf)
+    sasl_plain_password='LtG5496WgU',    # Contraseña SASL (mismo que en jaas.conf)
     key_serializer=lambda k: str(k).encode('utf-8'),  # Serializar la clave como string UTF-8
     value_serializer=lambda v: json.dumps(v).encode('utf-8')  # Serializar el valor como JSON UTF-8
 )

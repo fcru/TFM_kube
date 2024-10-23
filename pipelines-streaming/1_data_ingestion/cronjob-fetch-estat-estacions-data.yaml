@@ -20,6 +20,4 @@ spec:
             - name: ingest-estat-estacions-container
               image: ingest-estat-estacions-image:latest
               imagePullPolicy: Never
-              ports:
-                - containerPort: 8000
           restartPolicy: Never

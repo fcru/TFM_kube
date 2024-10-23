@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: update-status-service  # Nombre del servicio
+spec:
+  selector:
+    app: stream-update-status  # Selector que apunta al pod
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 8000          # El puerto del servicio
+      targetPort: 8000    # El puerto en el contenedor
+      nodePort: 30000

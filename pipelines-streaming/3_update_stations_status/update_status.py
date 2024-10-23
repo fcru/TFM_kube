@@ -1,6 +1,18 @@
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import from_json, col, from_unixtime, current_timestamp, when, lit
 from pyspark.sql.types import *
+import time
+import psutil
+from prometheus_client import Gauge, Counter, start_http_server
+
+# Iniciar el servidor HTTP de Prometheus en el puerto 8000
+start_http_server(8000)
+
+# Crear métricas de Prometheus
+join_time_gauge = Gauge('join_operation_duration_seconds', 'Time taken to perform the join operation')
+assign_status_time_gauge = Gauge('assign_status_operation_duration_seconds', 'Time taken to perform the assign_status operation')
+cpu_usage_gauge = Gauge('cpu_usage_percent', 'CPU usage percent')
+memory_usage_gauge = Gauge('memory_usage_percent', 'Memory usage percent')
 
 # Create a Spark session
 spark = SparkSession.builder \
@@ -37,7 +49,7 @@ dfInfo_with_clusters = spark.read \
 kafka_bootstrap_servers = "kafka:9092"
 kafka_topic = "estat_estacions"
 kafka_username = "user1"
-kafka_password = "tiSmu50tsg"
+kafka_password = "LtG5496WgU"
 
 df = spark.readStream \
     .format("kafka") \
@@ -58,24 +70,25 @@ data_df = df.selectExpr("CAST(value AS STRING) as value") \
 # Convert `last_reported` from Unix timestamp to proper timestamp
 data_df = data_df.withColumn("last_reported", from_unixtime(col("last_reported")).cast("timestamp"))
 
-# Renombrar la columna num_bikes_available en dfInfo_with_clusters
-#dfInfo_with_clusters = dfInfo_with_clusters.withColumnRenamed("num_bikes_available", "info_num_bikes_available")
-
 # Select the desired columns
 data_df = data_df.select("station_id", "num_bikes_available", "last_reported")
 dfInfo_with_clusters = dfInfo_with_clusters.select("station_id", "capacity", "truck", "lat", "lon")
 
 # Join data from Kafka with data from Neo4j based on "station_id"
 def join_data(data_df: DataFrame, dfInfo_with_clusters: DataFrame) -> DataFrame:
+    start_time = time.time()
     joined_df = data_df.join(
         dfInfo_with_clusters,
         on="station_id",
         how="left"
     )
+    join_duration = time.time() - start_time
+    join_time_gauge.set(join_duration)
     return joined_df
 
 # Assign a status and calculate the bikes to be replaced or removed
 def assign_status(joined_df: DataFrame) -> DataFrame:
+    start_time = time.time()
     status_df = joined_df.withColumn(
         "check_status",
         when(col("num_bikes_available").isNull() | col("capacity").isNull(), "undefined") \
@@ -90,7 +103,15 @@ def assign_status(joined_df: DataFrame) -> DataFrame:
         "bikes_to_remove",
         when(col("check_status") == "full", (0.25 * col("capacity")).cast(IntegerType())).otherwise(None)
     )
+    assign_status_duration = time.time() - start_time
+    assign_status_time_gauge.set(assign_status_duration)
     return status_df
+
+# CPU and Memory metrics
+def collect_system_metrics():
+    process = psutil.Process(os.getpid())
+    cpu_usage_gauge.set(process.cpu_percent())
+    memory_usage_gauge.set(process.memory_percent())
 
 joined_df = join_data(data_df, dfInfo_with_clusters)
 status_df = assign_status(joined_df)
@@ -110,4 +131,5 @@ query = to_neo4j \
     .option("save.mode", "Overwrite") \
     .start() \
     .awaitTermination()
+
 

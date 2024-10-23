@@ -8,9 +8,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY data_ingestion.py /opt/data_ingestion.py
 
-# Exponer el puerto de métricas
-EXPOSE 8000
-
 # Set the working directory
 WORKDIR /opt
 
