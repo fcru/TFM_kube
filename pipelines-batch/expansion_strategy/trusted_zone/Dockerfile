@@ -30,5 +30,4 @@ RUN curl -L -o /opt/spark/jars/mongo-spark-connector_2.12-10.1.1.jar \
 ENV PACKAGES=org.mongodb.spark:mongo-spark-connector_2.12:10.1.1
 
 
-
-ENTRYPOINT ["sleep", "infinity"]
+ENTRYPOINT ["python3", "trusted_main.py"]

@@ -2,4 +2,4 @@
 set -ex
 
 eval $(minikube docker-env)
-docker build -t exploitation-image:latest .
+docker build -t trusted-image:latest .

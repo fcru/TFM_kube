@@ -5,9 +5,7 @@ import time
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilities import *
-from formatted_functions import *
 
 def formatBicingState():
     # Initialize Spark session

@@ -1,9 +1,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: streamlit-cronjob
+  name: geojson-analysis
 spec:
-  schedule: "0 * * * *"
+  schedule: "0 2 * * *"
   suspend: true
   jobTemplate:
     spec:
@@ -12,6 +12,6 @@ spec:
         spec:
           containers:
             - name: pyspark-container
-              image: streamlit-app-image:latest
+              image: geoanalysis-image:latest
               imagePullPolicy: Never
           restartPolicy: Never

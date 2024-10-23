@@ -2,4 +2,4 @@
 set -ex
 
 eval $(minikube docker-env)
-docker build -t streamlit-app-image:latest .
+docker build -t geoanalysis-image:latest .

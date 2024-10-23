@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: batch-pipelines-cronjob
+  name: streamlit-cronjob
 spec:
   schedule: "0 * * * *"
   suspend: true
@@ -12,6 +12,6 @@ spec:
         spec:
           containers:
             - name: pyspark-container
-              image: pipelines-batch-image:latest
+              image: streamlit-app-image:latest
               imagePullPolicy: Never
           restartPolicy: Never

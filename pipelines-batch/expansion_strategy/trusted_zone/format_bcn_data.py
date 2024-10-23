@@ -134,11 +134,11 @@ def format_bcn_data(output_base_dir,hdfs_path):
         time.sleep(5)
 
 
-if __name__ == "__main__":
-    output_base_TMB = "hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/TMB"
-    hdfs_path = f"/landing-zone/batch/TMB/"
-    format_bcn_data(output_base_TMB, hdfs_path)
+    if __name__ == "__main__":
+        output_base_TMB = "hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/TMB"
+        hdfs_path = f"/landing-zone/batch/TMB/"
+        format_bcn_data(output_base_TMB, hdfs_path)
 
-    output_base_bcn = "hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/bcn_data"
-    hdfs_path = f"/landing-zone/batch/bcn_data/"
-    format_bcn_data(output_base_bcn, hdfs_path)
+        output_base_bcn = "hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/bcn_data"
+        hdfs_path = f"/landing-zone/batch/bcn_data/"
+        format_bcn_data(output_base_bcn, hdfs_path)

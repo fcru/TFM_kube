@@ -2,4 +2,4 @@
 set -ex
 
 eval $(minikube docker-env)
-docker build -t pipelines-batch-image:latest .
+docker build -t streamlit-app-image:latest .

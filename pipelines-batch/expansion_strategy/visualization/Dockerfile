@@ -11,8 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the app code
 COPY . .
 
-ENTRYPOINT ["python3", "analysis_main.py"]
+# Expose the Streamlit port
+EXPOSE 8501
 
-
-
-
+# Run the Streamlit app
+CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
