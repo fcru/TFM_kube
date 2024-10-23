@@ -1,13 +1,10 @@
 import numpy as np
-import geopandas as gpd
 from scipy.spatial import cKDTree
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import NearestNeighbors
 from sklearn.cluster import DBSCAN
 from shapely.geometry import Point as sh_point
 from scipy.interpolate import LinearNDInterpolator
-from pymongo import MongoClient
-from bson.json_util import dumps
 from utilities import *
 
 def nearest_dist(gdf1, gdf2):
@@ -112,7 +109,6 @@ def update_top_stations_with_distances(gdf_top_stations):
             'dist_bus_stops': float(row['dist_bus_stops']),
             'dist_metro_stations': float(row['dist_metro_stations']),
             'dist_bike_lanes': float(row['dist_bike_lanes']),
-            'dist_popular': float(row['dist_popular']),
             'dist_bike_station': float(row['dist_bike_station'])
         }
 
@@ -126,10 +122,8 @@ def get_similar_stations(projected=True):
     # Load data
     gdf_top_stations, top_stations_error = doc_to_gdf('top_stations',
                                                       fields=['name', 'station_id', 'geometry', 'reason'])
-    gdf_no_bikes = gdf_top_stations[gdf_top_stations['reason'].apply(lambda x: 'No Bikes' in x)]
-    gdf_no_docks = gdf_top_stations[gdf_top_stations['reason'].apply(lambda x: 'No Docks' in x)]
-    gdf_high = gdf_top_stations[gdf_top_stations['reason'].apply(lambda x: 'High Rotation' in x)]
-    gdf_stations, stations_error = filter_estacio_to_gdf(gdf_top_stations)
+    gdf_stations, stations_error = doc_to_gdf('estacio',
+                                                      fields=['name', 'station_id', 'geometry'])
     if gdf_stations is None or gdf_top_stations is None:
         print("Failed to load station data. Please check your database connection and data integrity.")
         if stations_error:
@@ -177,7 +171,6 @@ def get_similar_stations(projected=True):
     gdf_top_stations['dist_bus_stops'] = nearest_dist(gdf_top_stations, other_layers['Bus Stops'])
     gdf_top_stations['dist_metro_stations'] = nearest_dist(gdf_top_stations, other_layers['Metro Stations'])
     gdf_top_stations['dist_bike_lanes'] = gdf_top_stations.distance(other_layers["Bike Lanes"].unary_union)
-    gdf_top_stations['dist_popular'] = nearest_dist(gdf_top_stations, gdf_top_stations)
     gdf_top_stations['dist_bike_station'] = nearest_dist(gdf_top_stations, gdf_stations)
 
     update_top_stations_with_distances(gdf_top_stations)
@@ -190,12 +183,10 @@ def get_similar_stations(projected=True):
     xx, yy = np.meshgrid(x, y)
     potential_points_coords = np.column_stack((xx.ravel(), yy.ravel()))
 
-    #interpolated_altitudes = interpolate_altitude(known_points, known_altitudes, potential_points_coords)
 
     # Create potential points with interpolated altitudes
     points = [sh_point(x, y) for x, y in zip(xx.ravel(), yy.ravel())]
     potential_points = gpd.GeoDataFrame(geometry=points, crs=crs)
-    #potential_points['altitude'] = interpolated_altitudes
 
     # Perform spatial join with neighborhoods
     neighborhoods = other_layers['Neighbourhoods']
@@ -208,15 +199,12 @@ def get_similar_stations(projected=True):
     potential_points_within['dist_bus_stops'] = nearest_dist(potential_points_within, other_layers['Bus Stops'])
     potential_points_within['dist_metro_stations'] = nearest_dist(potential_points_within, other_layers['Metro Stations'])
     potential_points_within['dist_bike_lanes'] = potential_points_within.distance(other_layers["Bike Lanes"].unary_union)
-    potential_points_within['dist_popular'] = nearest_dist(potential_points_within, gdf_top_stations)
     potential_points_within['dist_bike_station'] = nearest_dist(potential_points_within, gdf_stations)
 
-    # Define features
     features = ['dist_education', 'dist_shopping', 'dist_bike_lanes', 'dist_cpoi', 'dist_bus_stops',
-                'dist_metro_stations', 'dist_popular', 'dist_bike_station']
+                'dist_metro_stations',  'dist_bike_station']
 
     # Filter out points too close to existing popular stations
-    potential_points_within = potential_points_within[potential_points_within['dist_popular'] > min_distance_st]
     potential_points_within = potential_points_within[potential_points_within['dist_bike_station'] > min_distance_st]
     potential_points_within = potential_points_within[potential_points_within['dist_bike_lanes'] < max_distance_bike]
 
