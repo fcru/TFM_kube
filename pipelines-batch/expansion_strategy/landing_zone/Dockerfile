@@ -31,10 +31,5 @@ ENV PACKAGES=org.mongodb.spark:mongo-spark-connector_2.12:10.1.1
 
 
 # Set the entrypoint to run specific test:
-#ENTRYPOINT ["/opt/spark/bin/spark-submit", "/opt/spark-job.py"]
-#ENTRYPOINT ["python3", "/opt/mongo-job.py"]
-#ENTRYPOINT ["python3", "/opt/landing-zone/batch/batch_scrape_bicing.py"]
-#ENTRYPOINT ["/opt/spark/bin/spark-submit", "--packages", \
-            #"org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.mongodb.spark:mongo-spark-connector_2.12:10.1.1", \
-            #"/opt/streaming-job.py"]
-ENTRYPOINT ["sleep", "infinity"]
+
+ENTRYPOINT ["python3", "batch_main.py"]

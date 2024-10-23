@@ -1,0 +1,5 @@
+pyspark==3.4.1.
+pymongo
+python-dotenv
+pandas
+hdfs

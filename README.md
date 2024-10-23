@@ -57,16 +57,6 @@ show dbs
 show collections
 ```
 
-### Show uuids content
-```
-db.uuids.find().pretty()
-```
-or delete all documents in a collection:
-
-```
-use testdb
-db.uuids.deleteMany({})
-```
 
 # Install Kafka
 ```
@@ -154,19 +144,24 @@ Then execute **from the pyspark folder**:
 Subscribes to the topic *my-topic* and connects to mongodb, to the current test collection to save the key and the value that it receives
 
 
-## Batch_scrape_bicing job
-Currently the uncommented lines run the batch-scraper to save files in hdfs from bicing API. 
-The default url is "https://opendata-ajuntament.barcelona.cat/data/es/dataset/informacio-estacions-bicing"
-At the moment to change to the estat estacio bicing we have to do it manually. 
+## Batch processing
 
-# Executing job using Batch_main.py
+### Expansion Strategy analysis
 
-The batch_main.py script allow to execute all the script with a build, choosing the selected one via terminal. 
-To do that, execute the build of build-pyspark.sh with the current setup.
+To execute the expansion strategy analysis you just need to run the cronjobs of any zone in sequential order:
 
-Once in k9s enter in the shell of the cronjob and then execute 
+- Landing Zone
+- Trusted Zone
+- Exploitation Zone
+- Geojson analysis
+- Visualization
 
-````
-python3 landing_zone/batch/batch_main.py
-```
+For each zone you should build & run the docker image with the shown command. 
+As an example for the landing zone: 
+./build_expansion_landing.sh
+kubectl apply -f cronjob-expnsion-landing.yaml
+
+Once created the cronjob you have to trigger it using k9s. The cronjob will automatically execute the code. 
+
+The visualization part expose a streamlit app on the port 8501 so you should expose the pod containing it directly in k9s and visit the app on localhost:8501.
 
