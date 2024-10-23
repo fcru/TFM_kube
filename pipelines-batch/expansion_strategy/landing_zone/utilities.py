@@ -140,7 +140,7 @@ def get_FileList_From_HDFS_Path(fs, Path, hdfs_path):
     return files
 
 def delete_file_hdfs(spark, hdfs_path):
-    # hdfs_path si es un directorio borrará todo el contenido del directorio y si es un fichero borrará el fichero
+
     fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jvm.java.net.URI.create(hdfs_path),
                                                         spark._jsc.hadoopConfiguration(), )
     return fs.delete(spark._jvm.org.apache.hadoop.fs.Path(hdfs_path), True)
