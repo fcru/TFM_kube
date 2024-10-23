@@ -184,21 +184,22 @@ def get_trucks(neo4j_conn):
     result = neo4j_conn.query("MATCH (t:Truck) RETURN DISTINCT t.truck_id AS truck")
     return [record["truck"] for record in result]
 
-# Send paths to kafka
-def send_to_kafka(truck, optimal_route):
+# Send paths to Kafka with distance
+def send_to_kafka(truck, optimal_route, distance):
     message = {
         "truck_id": truck,
         "optimal_route": [
-             {
-                 "station_id": station["station_id"],
-                 "lat": station["lat"],
-                 "lon": station["lon"],
-                 "capacity": station['capacity'],
-                 "check_status": station['check_status'],
-                 "num_bikes_available": station['num_bikes_available'],
-                 "truck": station['truck']
-             } for station in optimal_route
-         ]
+            {
+                "station_id": station["station_id"],
+                "lat": station["lat"],
+                "lon": station["lon"],
+                "capacity": station['capacity'],
+                "check_status": station['check_status'],
+                "num_bikes_available": station['num_bikes_available'],
+                "truck": station['truck']
+            } for station in optimal_route
+        ],
+        "distance": distance
     }
     producer.send(topic="truck-route", key=truck, value=message)
     producer.flush()
