@@ -1,6 +1,6 @@
 from kafka import KafkaProducer
 from neo4j import GraphDatabase
-import itertools
+from itertools import permutations
 import json
 
 # Neo4jConnection Class
@@ -25,7 +25,7 @@ producer = KafkaProducer(
     security_protocol='SASL_PLAINTEXT',  # Protocolo de seguridad
     sasl_mechanism='PLAIN',              # Mecanismo de SASL
     sasl_plain_username='user1',         # Usuario SASL (mismo que en jaas.conf)
-    sasl_plain_password='0mjD6x78KQ',    # Contraseña SASL (mismo que en jaas.conf)
+    sasl_plain_password='LtG5496WgU',    # Contraseña SASL (mismo que en jaas.conf)
     key_serializer=lambda k: str(k).encode('utf-8'),  # Serializar la clave como string UTF-8
     value_serializer=lambda v: json.dumps(v).encode('utf-8')  # Serializar el valor como JSON UTF-8
 )
@@ -112,16 +112,16 @@ def find_optimal_route_fixed_start(neo4j_conn, start_station, station_list):
     stations = [start_station] + station_list
     n = len(stations)
 
-    # Crear una matriz de distancias
+    # Create a distance matrix
     distances = [[0] * n for _ in range(n)]
     for i in range(n):
         for j in range(i+1, n):
-            cost, _ = calculate_shortest_path(neo4j_conn, stations[i], stations[j])
+            cost, _ = calculate_shortest_path(neo4j_conn, stations[i]['station_id'], stations[j]['station_id'])
             distances[i][j] = distances[j][i] = cost
 
-    # Implementar el algoritmo del vecino más cercano
-    unvisited = set(range(1, n))  # Excluir la estación de inicio
-    current = 0  # Índice de la estación de inicio
+    # Implement the nearest neighbor algorithm
+    unvisited = set(range(1, n))  # Exclude the starting station
+    current = 0  # Index of the starting station
     path = [current]
     total_distance = 0
 
@@ -132,13 +132,23 @@ def find_optimal_route_fixed_start(neo4j_conn, start_station, station_list):
         total_distance += distances[current][next_station]
         current = next_station
 
-    # Volver a la estación de inicio
+    # Return to the starting station
     path.append(0)
     total_distance += distances[current][0]
 
-    # Convertir índices de vuelta a IDs de estación
-    optimal_path = [stations[i] for i in path]
-
+    # Convert indices back to station IDs
+    optimal_path = [
+        {
+            "station_id": stations[i]['station_id'],
+            "lat": stations[i]['lat'],
+            "lon": stations[i]['lon'],
+            "capacity": stations[i]['capacity'],
+            "check_status": stations[i]['check_status'],
+            "num_bikes_available": stations[i]['num_bikes_available'],
+            "truck": stations[i]['truck']
+        }
+        for i in path
+    ]
     return total_distance, optimal_path
 
 # Function to get stations connected by the TO_INTERVENT relationship for a specific truck
@@ -146,10 +156,28 @@ def get_stations_for_truck(neo4j_conn, truck_id):
     query = """
     MATCH (s:Station)-[:TO_INTERVENT]-(t:Station)
     WHERE s.truck = $truck_id OR t.truck = $truck_id
-    RETURN DISTINCT s.station_id AS station_id
+    RETURN DISTINCT
+            s.station_id AS station_id,
+            s.lat AS lat,
+            s.lon AS lon,
+            s.capacity AS capacity,
+            s.check_status AS check_status,
+            s.num_bikes_available AS num_bikes_available,
+            s.truck AS truck
     """
     result = neo4j_conn.query(query, parameters={"truck_id": truck_id})
-    return [record["station_id"] for record in result]
+    return [
+        {
+            "station_id": record["station_id"],
+            "lat": record["lat"],
+            "lon": record["lon"],
+            "capacity": record['capacity'],
+            "check_status": record['check_status'],
+            "num_bikes_available": record['num_bikes_available'],
+            "truck": record['truck']
+        }
+        for record in result
+    ]
 
 # Function to get the list of trucks (clusters) from Neo4j
 def get_trucks(neo4j_conn):
@@ -160,7 +188,17 @@ def get_trucks(neo4j_conn):
 def send_to_kafka(truck, optimal_route):
     message = {
         "truck_id": truck,
-        "optimal_route": optimal_route
+        "optimal_route": [
+             {
+                 "station_id": station["station_id"],
+                 "lat": station["lat"],
+                 "lon": station["lon"],
+                 "capacity": station['capacity'],
+                 "check_status": station['check_status'],
+                 "num_bikes_available": station['num_bikes_available'],
+                 "truck": station['truck']
+             } for station in optimal_route
+         ]
     }
     producer.send(topic="truck-route", key=truck, value=message)
     producer.flush()

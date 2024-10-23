@@ -7,7 +7,7 @@ import json
 import logging
 from neo4j import GraphDatabase
 
-# Clean up neo4j database
+# Neo4jConnection Class
 class Neo4jConnection:
     def __init__(self, uri, user, password):
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
@@ -22,16 +22,17 @@ class Neo4jConnection:
 
 uri = "neo4j://neo4j-neo4j:7687"
 
+# Clean up neo4j database
 neo4j_conn = Neo4jConnection(uri, "", "")
 neo4j_conn.query("MATCH (n) DETACH DELETE n")
 
 
-# Crear una sesión de Spark
+# Create a Spark session
 spark = SparkSession.builder \
     .appName("Clustering") \
     .getOrCreate()
 
-# Definir el esquema del DataFrame Informació Estacions
+# Define the schema for the Informació Estacions DataFrame
 schemaInfo = StructType([
     StructField("station_id", IntegerType(), True),
     StructField("name", StringType(), True),
@@ -49,41 +50,41 @@ schemaInfo = StructType([
     StructField("rental_uris", StringType(), True)  # Usamos StringType() para manejar valores null
 ])
 
-# Función para obtener el df de Informació Estacions
+# Function to fetch the Informació Estacions DataFrame
 def fetch_data(url: str) -> DataFrame:
     try:
-        # Descargar datos usando urllib
+        # Download data using urllib
         request = urllib.request.Request(url)
         request.add_header('Authorization', 'b8092b37b02cda27d5d8e56cde9bfa9a49b15dab99bb06a06e89f72a931fa644')
         with urllib.request.urlopen(request) as response:
             data = response.read().decode('utf-8')
 
-        # Convertir los datos JSON a un objeto Python
+        # Convert JSON data to a Python object
         json_obj = json.loads(data)
         stations = json_obj["data"]["stations"]
 
-        # Crear un DataFrame de PySpark a partir del JSON
+        # Create a PySpark DataFrame from the JSON
         df = spark.createDataFrame(stations, schemaInfo)
         return df
     except Exception as e:
         logging.error(f"Error al descargar o procesar los datos: {e}")
         return None
 
-# Llamada a fetch_data
+# Call fetch_data
 url = 'https://opendata-ajuntament.barcelona.cat/data/ca/dataset/informacio-estacions-bicing/resource/f60e9291-5aaa-417d-9b91-612a9de800aa/download/Informacio_Estacions_Bicing_securitzat.json'
 dfInfo = fetch_data(url)
 
-# Configurar VectorAssembler para latitud y longitud
+# Configure VectorAssembler for latitude and longitude
 assembler = VectorAssembler(inputCols=["lat", "lon"], outputCol="features")
 dfInfo_with_features = assembler.transform(dfInfo)
 
-# Aplicar K-means
+# Apply K-means
 num_clusters = 25
 kmeans = KMeans(k=num_clusters, seed=1, featuresCol="features", predictionCol="truck")
 model = kmeans.fit(dfInfo_with_features)
 dfInfo_with_clusters = model.transform(dfInfo_with_features)
 
-# Escribir a Neo4j los nodos asignados a un cluster
+# Write the nodes assigned to a cluster to Neo4j
 dfInfo_with_clusters.select("station_id", "capacity", "truck", "lat", "lon").write \
     .format("org.neo4j.spark.DataSource") \
     .option("url", uri) \
@@ -92,15 +93,15 @@ dfInfo_with_clusters.select("station_id", "capacity", "truck", "lat", "lon").wri
     .option("node.keys", "station_id") \
     .save()
 
-# Crear tantos nodos como clusters creados. Cada nodo representa un camión
+# Create as many nodes as clusters created. Each node represents a truck
 
-# Define el esquema del DataFrame
+# Define the schema for the DataFrame
 schema = StructType([
     StructField("truck_id", IntegerType(), True),
     StructField("capacity", IntegerType(), True)
 ])
 
-# Crear los datos con truck_id dinámico y capacidad fija
+# Create the data with dynamic truck_id and fixed capacity
 capacity = 30
 data = [(i, capacity) for i in range(0, num_clusters)]
 

@@ -9,6 +9,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY update_status.py /opt/update_status.py
 
+# Exponer el puerto de métricas
+EXPOSE 8000
+
 # Set the working directory
 WORKDIR /opt
 

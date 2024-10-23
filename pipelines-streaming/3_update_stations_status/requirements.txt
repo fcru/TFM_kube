@@ -1,3 +1,5 @@
 pyspark
 kafka-python
 neo4j
+prometheus_client
+psutil

@@ -4,7 +4,7 @@ metadata:
   name: clustering-stations-cronjob
 spec:
   schedule: "0 */12 * * *"
-  suspend: false
+  suspend: true
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1

@@ -3,8 +3,8 @@ kind: CronJob
 metadata:
   name: stream-update-status-cronjob
 spec:
-  schedule: "*/10 * * * *"
-  suspend: false
+  schedule: "* * * * *"
+  suspend: true
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 1
@@ -12,9 +12,14 @@ spec:
     spec:
       backoffLimit: 0
       template:
+        metadata:
+          labels:
+            app: stream-update-status  # Etiqueta estática
         spec:
           containers:
             - name: stream-update-status-container
               image: stream-update-status-image:latest
               imagePullPolicy: Never
+              ports:
+                - containerPort: 8000
           restartPolicy: Never
