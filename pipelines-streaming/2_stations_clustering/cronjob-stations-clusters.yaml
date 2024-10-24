@@ -1,0 +1,20 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: clustering-stations-cronjob
+spec:
+  schedule: "0 */12 * * *"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          containers:
+            - name: clustering-stations-container
+              image: clustering-stations-image:latest
+              imagePullPolicy: Never
+          restartPolicy: Never

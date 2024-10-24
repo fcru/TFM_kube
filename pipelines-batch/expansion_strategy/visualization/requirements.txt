@@ -1,0 +1,14 @@
+pymongo
+python-dotenv
+pandas
+geojson
+geopandas
+pyarrow
+streamlit
+folium
+streamlit-folium
+contextily
+shapely
+scikit-learn
+numpy
+scipy

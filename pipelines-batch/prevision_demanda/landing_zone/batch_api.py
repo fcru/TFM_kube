@@ -5,7 +5,6 @@ from pyspark.sql import SparkSession
 
 load_dotenv()
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utilities import *
 
 APP_ID = os.getenv('APP_ID')

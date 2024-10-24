@@ -52,8 +52,15 @@ def save_json_hdfs(spark,response,file_name, context):
     json_str = json.dumps(data)
     rdd = spark.sparkContext.parallelize([json_str])
     df = spark.read.json(rdd)
+    df.show()
     hdfs_path=f"hdfs://hadooop-hadoop-hdfs-nn:9000/landing-zone/batch/{context}/{file_name}"
+<<<<<<<< HEAD:pipelines-batch/prevision_demanda/utilities.py
     df.write.mode("overwrite").json(hdfs_path)
+========
+    df.write.mode("overwrite").parquet(hdfs_path)
+    df = spark.read.parquet(hdfs_path)
+    df.printSchema()
+>>>>>>>> PRE_DemandaFusion:pipelines-batch/expansion_strategy/landing_zone/utilities.py
     print(f"JSON file successfully written to {hdfs_path}")
 
 
@@ -133,6 +140,23 @@ def get_FileList_From_HDFS_Path(fs, Path, hdfs_path):
             files.append(status.getPath().toString())
         else:
             files.extend(get_FileList_From_HDFS_Path(fs,Path,hdfs_path=status.getPath().toString()))
+<<<<<<<< HEAD:pipelines-batch/prevision_demanda/utilities.py
+========
+
+    return files
+
+def delete_file_hdfs(spark, hdfs_path):
+
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jvm.java.net.URI.create(hdfs_path),
+                                                        spark._jsc.hadoopConfiguration(), )
+    return fs.delete(spark._jvm.org.apache.hadoop.fs.Path(hdfs_path), True)
+
+def move_files_hdfs(spark, file_orig, file_dest):
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(spark._jsc.hadoopConfiguration())
+    origen = spark._jvm.org.apache.hadoop.fs.Path(file_orig)
+    destino = spark._jvm.org.apache.hadoop.fs.Path(file_dest)
+    fs.rename(origen, destino)
+>>>>>>>> PRE_DemandaFusion:pipelines-batch/expansion_strategy/landing_zone/utilities.py
 
     return files
 

@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ingest-estat-estacions-cronjob
+spec:
+  schedule: "* * * * *"
+  suspend: false
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: ingest-estat-estacions  # Etiqueta estática
+        spec:
+          containers:
+            - name: ingest-estat-estacions-container
+              image: ingest-estat-estacions-image:latest
+              imagePullPolicy: Never
+          restartPolicy: Never

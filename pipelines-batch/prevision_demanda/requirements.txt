@@ -1,4 +1,4 @@
-pyspark
+pyspark==3.4.1.
 pymongo
 requests
 py7zr
@@ -6,6 +6,3 @@ beautifulsoup4
 python-dotenv
 pandas
 hdfs
-geojson
-geopandas
-pyarrow
