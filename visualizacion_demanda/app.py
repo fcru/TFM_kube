@@ -85,31 +85,6 @@ def crear_grafico_comparativo(real_data, pred_data, type):
     )
     return chart
 
-def crear_grafico_comparativo_returned(real_data, pred_data):
-    df_real = pd.DataFrame({
-        'fecha': real_data['fecha'],
-        'total_bikes_returned': real_data['total_bikes_returned'],
-        'type': 'Real'
-    })
-
-    df_pred = pd.DataFrame({
-        'fecha': real_data['fecha'],
-        'total_bikes_returned': pred_data,
-        'type': 'Predicción'
-    })
-
-    df_comparativo = pd.concat([df_real, df_pred])
-
-    chart = alt.Chart(df_comparativo).mark_line().encode(
-        x='fecha:T',
-        y='total_bikes_returned:Q',
-        color='type:N'
-    ).properties(
-        title="Total bicicletas devueltas"
-    )
-
-    return chart
-
 
 def get_popup_demanda(row, df):
     # leer los datos reales
@@ -133,12 +108,13 @@ def get_popup_demanda(row, df):
     popup_text = f"""
                 <span style='font-family:Arial;'>
                 <h3>Estación: {row['station_id']} - {row['name']}</h3>
+                <h4>Nivel de rotación: {row['rotacion']:.2f}</h4>
                 <h4>Predicción de la demanda vs Realidad a 30/09/2024</h4>
                 {chart_concat_html}
                 </span>
                 """
 
-    iframe = folium.IFrame(popup_text, width=750, height=500)
+    iframe = folium.IFrame(popup_text, width=900, height=550)
     popup_form = folium.Popup(iframe)  
     return popup_form
 
@@ -149,7 +125,7 @@ def get_filtered_data(df):
     start_date = datetime(min_fecha.year, min_fecha.month, min_fecha.day, 0)
     end_date = datetime(max_fecha.year, max_fecha.month, max_fecha.day, 23)
 
-    fecha_inicio, fecha_fin  = st.slider(
+    fecha_inicio, fecha_fin  = st.sidebar.slider(
         "Selecciona un rango de fechas",
         min_value=start_date,
         max_value=end_date,
@@ -160,7 +136,7 @@ def get_filtered_data(df):
     fecha_inicio_str = fecha_inicio.strftime('%d %b %Y, %I:%M%p')
     fecha_fin_str = fecha_fin.strftime('%d %b %Y, %I:%M%p')
 
-    st.info('Inicio: **%s** Fin: **%s**' % (fecha_inicio_str,fecha_fin_str))
+    st.sidebar.info('Inicio: **%s**  \nFin: **%s**' % (fecha_inicio_str,fecha_fin_str))
 
     df_filtrado = df[(df['fecha'] >= fecha_inicio) & (df['fecha'] <= fecha_fin)]
 
@@ -194,13 +170,9 @@ def main():
         
         df_filtrado = get_filtered_data(estado_bicing)
 
-    with st.sidebar:
-        selected = option_menu(
-            menu_title="Estudio de la demanda",
-            options=["Demanda total", "Eficiencia según demanda"],
-        )
-    
-    if selected == "Demanda total":
+    tab_demanda, tab_eficiencia = st.tabs(["Predicción demanda", "Eficiencia estaciones"])
+
+    with tab_demanda:
         demanda_total = df_filtrado.groupby('station_id')['rotacion'].mean().reset_index()
         estaciones_demanda = pd.merge(demanda_total, info_estaciones, on='station_id', how='left')
 
@@ -221,11 +193,11 @@ def main():
                 lazy=True
             ).add_to(marker_cluster)
 
-        st.header("Clasificación estaciones según demanda total", divider=True)
-        st.components.v1.html(folium.Figure().add_child(map_dem).render(), width=775,height=750)
-        #folium_static(map_dem,width=900, height=800)
+        st.subheader("Demanda de las estaciones", divider=True)
+        figure = folium.Figure().add_child(map_dem)
+        st.components.v1.html(figure.render(), width=1200,height=750)
 
-    elif selected == "Eficiencia según demanda":
+    with tab_eficiencia:
         # Tasa de eficiencia promedio agrupada por estación y unida a los datos de la estación
         tasa_promedio = df_filtrado.groupby('station_id')['tasa_eficiencia_ajustada'].mean().reset_index()
         estaciones_con_tasa = pd.merge(tasa_promedio, info_estaciones, on='station_id', how='left')
@@ -245,12 +217,10 @@ def main():
                 tooltip=get_tooltip_eficiencia(row)
             ).add_to(map_ef)
 
-        st.header("Clasificación de las estaciones según su eficiencia", divider=True)
-        st.components.v1.html(folium.Figure().add_child(map_ef).render(), width=775,height=750)
-        #st.title("Eficiencia según demanda")
-
-    # Mostrar el mapa en Streamlit
-    #folium_static(m,width=1500, height=800)
-
+        st.subheader("Clasificación de las estaciones según su eficiencia", divider=True)
+        figure = folium.Figure().add_child(map_ef)
+        st.components.v1.html(figure.render(), width=1200,height=750)
+        
+    
 if __name__ == "__main__":
     main()
