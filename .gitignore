@@ -1,1 +1,8 @@
 .idea
+.venv
+*.pyc
+pipelines-batch/prevision_demanda/data
+pipelines-batch/prevision_demanda/visualizacion/data/*.csv
+pipelines-batch/prevision_demanda/visualizacion/data/*.zip
+pipelines-batch/prevision_demanda/visualizacion/data/predicts/returned/*.csv
+pipelines-batch/prevision_demanda/visualizacion/data/predicts/taken/*.csv

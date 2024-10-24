@@ -1,0 +1,7 @@
+pandas
+streamlit
+folium
+streamlit-folium
+pyarrow
+altair
+streamlit-option-menu
