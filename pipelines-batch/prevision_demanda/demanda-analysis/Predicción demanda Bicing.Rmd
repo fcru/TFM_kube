@@ -1,0 +1,468 @@
+---
+title: "TFM - Previsión de la demanda"
+author: "Francesca Cruañes; Anna Majó; Laura Figuerola"
+date: "2024-10-08"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Análisis de previsión de la demanda de las estaciones del Bicing de Barcelona
+
+### Instalación de paquetes necesarios
+```{r}
+install.packages("tscount")
+install.packages(c("foreach", "doParallel"))
+install.packages("forecast")
+install.packages("data.table")
+install.packages("seastests")
+```
+
+### Librerías necesarias
+```{r}
+# Librerías necesarias para el análisis
+library(data.table)
+library(dplyr)
+
+library(foreach)
+library(doParallel)
+
+library(tseries)
+library(seastests)
+
+library(tscount)
+library(forecast)
+```
+
+## Lectura de los datasets
+
+#### Dataset con la información de las estaciones
+```{r}
+info_estaciones <- fread("data/info_estaciones.csv")
+infst<-setorder(info_estaciones, -station_id)
+infst
+```
+
+#### Dataset con el estado de las estaciones y su respectiva demanda
+```{r}
+data <- fread("data/estado_bicing_completo.csv")
+head(data)
+```
+
+## Inspección y adecuación de los datos a nivel general
+```{r}
+dim(data)
+summary(data)
+```
+
+#### Formateo de los dato y exclusión de estaciones no válidas
+```{r}
+#actualizar la columna festivo adecuadamente
+data[laborable == 0 & weekday >= 1 & weekday < 6, festivo := 1]
+
+#convertir status_station, hora_info, season, month, hora_dia, festivo, weekday, laborable a Factor
+data[, laborable := as.factor(laborable)]
+data[, weekday := as.factor(weekday)]
+data[, festivo := as.factor(festivo)]
+
+data[, status_station := as.factor(status_station)]
+data[, hora_info := as.factor(hora_info)]
+data[, season := as.factor(season)]
+data[, month := as.factor(month)]
+data[, hora_dia := as.factor(hora_dia)]
+#year no pq tiene tendencia creciente
+
+# descartamos las estaciones no válidas
+data <- data[!(station_id %in% c(527,529,532,533,535,536,542,543))]
+```
+
+## Analisis de los datos por estación con el modelo TSGLM
+
+#### Funciones de preprocesado y limpieza de los datos
+```{r}
+# Eliminación de las lecturas duplicadas
+eliminar_duplicados <- function (datos_estacion) {
+  # Descartar columnas no utilizadas en el análisis
+  columnas_a_eliminar <- c("num_bikes_available", "num_docks_available", "num_bikes_error")
+  datos_estacion <- datos_estacion[, !(names(datos_estacion) %in% columnas_a_eliminar), with = FALSE]
+  # Eliminamos duplicados puros
+  datos_estacion <- unique(datos_estacion)
+
+  dias_inusuales <- datos_estacion[, .(observaciones = .N), 
+                                   by = .(fecha = as.Date(last_reported_local))][observaciones != 24]
+  horas_duplicadas <- datos_estacion[as.Date(last_reported_local) %in% dias_inusuales$fecha, .(count = .N),
+                                   by = .(fecha = as.Date(last_reported_local), hora_dia)][count > 1]
+  registros_duplicados <- datos_estacion[as.Date(last_reported_local) %in% horas_duplicadas$fecha,
+                                   .(last_reported_local, hora_dia, total_bikes_taken, total_bikes_returned, temperatura, precipitacion, humedad, viento),
+                                   by = .(fecha = as.Date(last_reported_local))][horas_duplicadas, on = .(fecha, hora_dia)]
+
+  if (nrow(registros_duplicados) > 0){
+    datos_estacion[, total_bikes := pmax(total_bikes_taken, total_bikes_returned, na.rm = TRUE)]
+    datos_estacion[, fecha := as.Date(last_reported_local)]
+    setorder(datos_estacion, fecha, hora_dia, last_reported_local, -total_bikes)
+    # Eliminamos el resto de duplicados quedándonos con los de menor fecha registro y mayor número de demanda
+    datos_estacion <- unique(datos_estacion, by = c("fecha", "hora_dia"))
+    duplicados_restantes <- datos_estacion[, .N, by = .(fecha, hora_dia)][N > 1]
+    if (nrow(duplicados_restantes) == 0) {
+      print(paste("Registros totales por estación: ",nrow(datos_estacion)))
+    } else {
+      print("Aún hay duplicados:")
+      print(duplicados_restantes)
+    }
+  }
+
+  return(datos_estacion)
+}
+
+# Comprobación de si hay saltos en las frecuencias diarias de 24h entre la fecha de creación de la estación 
+# y la fecha de cierre o fin de estudio
+hay_datos_faltantes <- function(datos_estacion) {
+  fecha_inicio <- as.POSIXct(paste(unique(datos_estacion$creation_date), "00:00:00"), format = "%Y-%m-%d %H:%M:%S", tz="UTC")
+  fecha_fin <- as.POSIXct(paste(unique(datos_estacion$end_date), "23:00:00"), format = "%Y-%m-%d %H:%M:%S", tz="UTC")
+
+  fechas_esperadas <- seq(from = fecha_inicio,
+                          to = fecha_fin,
+                          by = "hour")
+
+  datos_estacion[, fecha:= as.POSIXct(paste(year, month, day, hora_dia, "00:00"), format= "%Y %m %d %H %M", tz="UTC")]
+  fechas_faltantes <- setdiff(fechas_esperadas, datos_estacion$fecha)
+
+  if(length(fechas_faltantes) == 0) {
+    return(FALSE)
+  } else {
+    print(paste("Faltan", length(fechas_faltantes), "observaciones."))
+    print("Primeras 10 fechas faltantes:")
+    print(head(fechas_faltantes, 10))
+    return(TRUE)
+  }
+}
+
+# Split de los datos de la estación entre train y test según la frecuencia indicada
+split_datos_estacion_new <- function(datos_estacion, frecuencia){
+  train_data <- datos_estacion[1:(.N-frecuencia)]
+  test_data <- datos_estacion[(.N-(frecuencia-1)):.N]
+
+  return(list(train = train_data, test = test_data))
+}
+
+# Split de los datos de la estación entre train y test teniendo en cuenta los ciclos completos de 24h
+split_datos_estacion <- function(datos_estacion, frecuencia, train_ratio){
+  # Número total de ciclos completos
+  total_ciclos <- nrow(datos_estacion) %/% frecuencia
+  # Número de ciclos para el conjunto de entrenamiento
+  train_ciclos <- floor(total_ciclos * train_ratio)
+  # Punto de división
+  split_point <- train_ciclos * frecuencia
+
+  # División de los datos
+  train_data <- datos_estacion[1:split_point]
+  test_data <- datos_estacion[(split_point + 1):nrow(datos_estacion)]
+
+  return(list(train = train_data, test = test_data))
+
+}
+```
+
+#### Funciones de configuración y predicción del modelo
+```{r}
+# Creación de las series temporales de training para las bicicletas retiradas y para las bicicletas devueltas
+create_ts <- function(datos, anyo, mes){
+  y_train <- ts(datos, start = c(anyo, mes), frequency = 24 * 365.25)
+
+  return(y_train)
+}
+
+# Determinación de la estacionariedad a partir de la prueba de Dickey-Fuller aumentada (ADF)
+serie_estacionaria <- function(time_series){
+  estacionariedad <- adf.test(time_series)
+  if(estacionariedad$p.value < 0.05){
+    return(TRUE)
+  } else {
+    return(FALSE)
+  }
+}
+
+# Determinación de la estacionalidad de una serie con la prueba estadística de la estacionalidad
+serie_estacional <- function(time_series){
+  return(isSeasonal(time_series, freq = 24, test = "combined"))
+}
+
+# Determinación de los parámetros a informar en la propiedad model: medias móviles (q-MA) y orden autoregresivo (p-AR)
+select_orders <- function(time_series) {
+  auto_arima_res <- auto.arima(time_series)
+  p <- auto_arima_res$arma[1]
+  q <- auto_arima_res$arma[2]
+
+  return(list(p = p, q = q))
+}
+
+# Para decidir la familia del modelo (Poisson o Binomial Negativa) se verifica si hay sobre-dispersión. 
+# Para ello calculamos el índice de dispersión. Si I > 1 la Binomial Negativa puede ser más apropiada
+get_familia <- function(ts_data){
+  var_ts <- var(ts_data)
+  mean_ts <- mean(ts_data)
+  
+  indice_dispersion <- var_ts / mean_ts
+
+  if(indice_dispersion > 1){
+    familia = "nbinom" # Binomial Negativa
+  } else {
+    familia = "poisson"
+  }
+  return(familia)
+}
+
+# creación del modelo TSGLM
+create_tsglm_model <- function(ts_data, train_data) {
+  # Si la serie es estacionaria podríamos aplicar diferencias
+  #if(serie_estacionaria(ts_data) == FALSE) {}
+  xreg <- cbind(train_data$temperatura,
+                train_data$precipitacion,
+                train_data$humedad,
+                train_data$viento,
+                train_data$laborable, #eliminar por correlación alta con weekday
+                train_data$festivo,
+                train_data$weekday,
+                train_data$hora_info,
+                train_data$season)
+  
+  if (serie_estacional(ts_data) == TRUE) {
+    # Debemos tener en cuenta la estacionalidad a las 12 y 24 horas (lags)
+    modelo <- list(past_obs = c(1, 12, 24), past_mean = c(1, 12, 24))
+    
+    # Añadimos una variable de estacionalidad a las variables exógenas
+    season <- as.factor(cycle(ts_data))
+    xreg <- cbind(xreg, season)
+  } else {
+    # Si no hay estacionalidad seleccionamos órdenes p y q a partir de ACF y PACF
+    orders <- select_orders(ts_data)
+    modelo <- list(past_obs = orders$p, past_mean = orders$q)
+  }
+
+  familia <- get_familia(ts_data)
+
+  # Ajustar el modelo TSGLM
+  model <- tsglm(ts_data,
+                 model = modelo,
+                 xreg = xreg,
+                 link = "log",
+                 distr = familia)
+
+  return(model)
+}
+
+ejecutar_prediccion <- function(model, station_id, p_type){
+  predicciones <- predict(model, n.ahead = 24)
+  predicciones_df <- data.frame(
+    Predicted = predicciones$pred,
+    Lower_Interval = predicciones$interval[, 1],
+    Upper_Interval = predicciones$interval[, 2]
+  )
+  
+  write.csv(predicciones_df, paste0("predicts/", p_type, "/", station_id, "_prediccion_", p_type, ".csv"), row.names = FALSE)
+}
+```
+
+## Ejecución del modelo TSGLM
+
+#### Preprocesado de los datos y obtención de los datos de train y test para el análisis
+```{r}
+all_station_IDs <- unique(data[order(-station_id), station_id])
+clean_station_data <- data.table::data.table()
+
+datos_divididos_estaciones <- lapply(all_station_IDs, function(station) {
+  tryCatch({
+    print(paste("ID Estación: ", station))
+    station_data <- data[station_id == station]
+    
+    setorder(station_data, last_reported_local)
+    station_data <- eliminar_duplicados(station_data)
+    print("Duplicados eliminados")
+  
+    if (hay_datos_faltantes(station_data) == FALSE){
+      setorder(station_data, last_reported_local)
+      # División de los datos entre train y test
+      # resultado <- split_datos_estacion(station_data, frecuencia = 24, train_ratio = 0.8)
+      resultado <- split_datos_estacion_new(station_data, frecuencia = 24)
+      print("Datos separados")
+      
+      # acumulado de los datos limpios de la estación
+      clean_station_data <- rbindlist(list(clean_station_data, station_data), fill=TRUE)
+      assign("clean_station_data", clean_station_data, envir = .GlobalEnv)
+    }
+    
+    list(station_id = station, train_data = resultado$train, test_data = resultado$test, error = NA_character_)
+  }, error = function(e) {
+    list(station_id = station, train_data = list(NULL), test_data = list(NULL), error = paste("Error en estación", station, ":", e$message))
+  })
+})
+```
+
+### Recuperación de las columnas eliminadas
+```{r}
+setkey(clean_station_data, station_id, last_reported_local)
+setkey(data, station_id, last_reported_local)
+
+data_agregado <- data[, .(
+  num_bikes_available = mean(num_bikes_available),
+  num_docks_available = mean(num_docks_available),
+  num_bikes_error = mean(num_bikes_error)
+), by = .(station_id, last_reported_local)]
+
+# Si quieres mantener todas las filas de clean_station_data, incluso las que no tienen correspondencia en data_agregado:
+clean_data <- clean_station_data[data_agregado,
+                                on = .(station_id, last_reported_local),
+                                nomatch = 0L]
+
+clean_data[, tasa_eficiencia_ajustada := 
+    (0.5 + 0.5 * (num_bikes_available / (num_bikes_available + num_docks_available))) * 
+    (1 - (abs(total_bikes_taken - total_bikes_returned) / (total_bikes_taken + total_bikes_returned + 1)))
+]
+
+# fwrite(clean_data, "data/estado_bicing_limpio.csv")
+```
+
+```{r}
+#Descarga de los datos por años
+clean_data[,c("creation_date", "end_date", "status_station", "last_reported_local", "total_bikes", "tasa_eficiencia_ajustada"):= NULL]
+```
+
+```{r}
+clean_data_2021 <- clean_data[year==2021]
+fwrite(clean_data_2021, "data/estado_bicing_limpio_2021.csv")
+clean_data_2022 <- clean_data[year==2022]
+fwrite(clean_data_2022, "data/estado_bicing_limpio_2022.csv")
+clean_data_2023 <- clean_data[year==2023]
+fwrite(clean_data_2023, "data/estado_bicing_limpio_2023.csv")
+clean_data_2024 <- clean_data[year==2024]
+fwrite(clean_data_2024, "data/estado_bicing_limpio_2024.csv")
+```
+
+```{r}
+estaciones_exitosas <- Filter(function(x) is.na(x$error), datos_divididos_estaciones)
+#ordenamos la lista de forma descendiente
+station_ids <- sapply(estaciones_exitosas, function(x) x$station_id)
+indices_orden <- order(station_ids, decreasing = TRUE)
+estaciones_exitosas <- estaciones_exitosas[indices_orden]
+
+datos_sample <- estaciones_exitosas[501:515]
+```
+
+
+#### Ejecución del modelo TSGLM
+```{r}
+#datos_divididos_estaciones
+
+tiempo_inico <- Sys.time()
+
+models <- lapply(datos_sample, function(station) {
+  station_id <- station$station_id
+  train_data <- station$train_data
+  
+  tryCatch({
+    print(paste("ID Estación: ", station_id))
+    ti_station <- Sys.time()
+    
+    anyo <- train_data[1, year][[1]]
+    mes <- train_data[1, month][[1]]
+    ts_taken <- create_ts(train_data$total_bikes_taken, anyo, mes)
+    ts_returned <- create_ts(train_data$total_bikes_returned, anyo, mes)
+    #print("Series temporales creadas")
+      
+    model_taken <- create_tsglm_model(ts_taken, train_data)
+    #Almacenado del modelo en disco
+    saveRDS(model_taken, paste0("models/taken/", station_id, "_modelo_tsglm_taken.rds"))
+    #print(paste("Estación ", station_id, " - Modelo TAKEN creado"))
+    ejecutar_prediccion(model_taken, station_id, "taken")
+    #print("Predicción TAKEN realizada")
+      
+    model_returned <- create_tsglm_model(ts_returned, train_data)
+    #Almacenado del modelo en disco
+    saveRDS(model_returned, paste0("models/returned/", station_id, "_modelo_tsglm_returned.rds"))
+    #print(paste("Estación ", station_id, " - Modelo RETURNED creado"))
+    ejecutar_prediccion(model_returned, station_id, "returned")
+    #print("Predicción RETURNED realizada")
+    
+    tf_station <- Sys.time()
+
+    tt_station <- difftime(tf_station, ti_station, units = "mins")
+    print(paste0("Tiempo ejecución estación ", station_id, ": ", tt_station, " minutos"))
+        
+    list(station = station_id, model_taken = model_taken, model_returned = model_returned)
+  }, error = function(e) {
+    print(paste0("Error: ", e$message))
+    list(station = station_id, error = paste("Error en estación", station_id, ":", e$message))
+  })
+})
+
+tiempo_fin <- Sys.time()
+
+tiempo_total <- difftime(tiempo_fin, tiempo_inico, units = "mins")
+print(paste("Tiempo total de ejecución:", tiempo_total, "minutos"))
+
+```
+#### Almacenamiento de los resultados en disco
+```{r}
+saveRDS(models, "models/modelos_tsglm_493-17.rds")
+```
+
+#### Recalculo de las predicciones
+```{r}
+datos_sample <- estaciones_exitosas[252:500]
+lapply(datos_sample, function(station) {
+  station_id <- station$station_id
+  
+  print(paste("ID Estación: ", station_id))
+  ti_station <- Sys.time()
+  
+  model_taken <- readRDS(paste0("models/taken/", station_id, "_modelo_tsglm_taken.rds"))
+  ejecutar_prediccion(model_taken, station_id, "taken")
+  
+  model_returned <- readRDS(paste0("models/returned/", station_id, "_modelo_tsglm_returned.rds"))
+  ejecutar_prediccion(model_returned, station_id, "returned")
+
+  tf_station <- Sys.time()
+
+  tt_station <- difftime(tf_station, ti_station, units = "mins")
+  print(paste0("Tiempo ejecución estación ", station_id, ": ", tt_station, " minutos"))
+})
+```
+
+```{r}
+lapply(datos_sample, function(station) {
+  station_id <- station$station_id
+  model <- Filter(function(x) x$station == station_id, models4)
+  
+  model_taken <- model$model_taken
+  ejecutar_prediccion(model_taken, station_id, "taken")
+  print("Predicción TAKEN realizada")
+  model_returned <- model$model_returned
+  ejecutar_prediccion(model_returned, station_id, "returned")
+  print("Predicción RETURNED realizada")
+})
+```
+
+
+```{r}
+acf(residuals(modelo))
+pacf(residuals(modelo))
+pit(modelo)
+```
+
+#### Configuración del clúster
+```{r}
+# Configura el clúster paralelo
+num_cores <- detectCores() - 1
+cl <- makeCluster(num_cores)
+registerDoParallel(cl)
+```
+#### Stop del clúster
+```{r}
+stopCluster(cl)
+
+#models <- foreach(station = estaciones,
+#                 .packages = c("tscount", "forecast", "data.table")) %dopar% {}
+
+```

@@ -129,11 +129,6 @@ def fill_null_values(df):
     return df
 
 # def explore_data(df):    
-#     #|station_id|year|month|day|hora_dia|creation_date|  end_date|num_bikes_available|num_docks_available|num_bikes_error|total_bikes_taken|total_bikes_returned|
-#     # status_station|festivo|weekday|laborable|       temperatura|       precipitacion|humedad|            viento|last_reported_local|    hora_info|   season|
-
-#     # 520| 532| 536| 535 (520 - 4)
-
 #     df_stations = df.select("station_id", "name").distinct()
 #     num_estaciones = df_stations.count()
 #     print(f"Número total de estaciones: {num_estaciones}")
@@ -147,7 +142,7 @@ def main():
         .config("spark.executor.cores", "6") \
         .getOrCreate()
     
-    spark.sparkContext.addPyFile("analisis-demanda/analisis_functions.py")
+    spark.sparkContext.addPyFile("explotation_zone/analisis_functions.py")
 
     #Lectura del dataset generado con los datos del estado de las estaciones del bicing + datos complementarios
     df = read_dataset(spark, "/opt/data/estado_bicing.csv")

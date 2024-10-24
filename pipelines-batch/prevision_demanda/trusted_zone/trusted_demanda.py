@@ -40,7 +40,7 @@ def merge_informacio(spark, df, str_date, year, mes):
         #Merge dataframes para informar de la capacidad en de la estación en el estado
         df_merged = df.join(df_informacio.select("station_id", "capacity"), on="station_id", how="left")
 
-        #Almacenamos los datos de información en HDFS
+        #Almacenamos los datos de información en HDFS por temas de recursos
         # informacio_path_dest = f"hdfs://hadooop-hadoop-hdfs-nn:9000/trusted-zone/informacio/{year}/{str(mes).zfill(2)}"
         # informacio_file_dest = f"{informacio_path_dest}/{file_date_str}.parquet"
         

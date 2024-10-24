@@ -1,6 +1,6 @@
 import sys
 import time
-from analisis_functions import read_dataset
+from explotation_zone.analisis_functions import read_dataset
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.ml import Pipeline
@@ -106,7 +106,7 @@ def main(test):
         .config("spark.executor.cores", "6") \
         .getOrCreate()
     
-    spark.sparkContext.addPyFile("analisis-demanda/analisis_functions.py")
+    spark.sparkContext.addPyFile("explotation-zone/analisis_functions.py")
     spark.sparkContext.setLogLevel("ERROR")
 
     df = read_dataset(spark, "/opt/data/estado_bicing_completo.csv")

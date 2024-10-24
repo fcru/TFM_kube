@@ -107,8 +107,6 @@ while op != 0:
             download_Meteocat_data(url, 30, 'viento', 'METEOCAT', year)
 
             year = year + 1
-        #download_Meteocat_data(url, 30, 'viento', 'METEOCAT', 2022)
-        #download_Meteocat_data(url, 30, 'viento', 'METEOCAT', 2023)
     elif op == 9:
         #Festivos generales de Catalunya
         url ='https://analisi.transparenciacatalunya.cat/resource/8qnu-agns.json'
