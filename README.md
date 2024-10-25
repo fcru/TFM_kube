@@ -74,8 +74,9 @@ sasl.mechanism=PLAIN
 sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="user1" password="XXXXX";
 ```
 Jaas.conf is no longer necessary to create as it has been created within the project and is saved via the dockerfile.
+It is only necessary to create it before creating the kafka topics
 
-To change the password, modify the file kafka_client_jaas.conf.
+To change the kafka secret, modify the file kafka_client_jaas.conf.
 
 #### jaas.conf
 ```
@@ -127,22 +128,42 @@ cypher-shell -a neo4j://neo4j-neo4j:7687
 kubectl apply -f manifests/cronjob-spark.yaml
 ```
 
-# Execute pyspark-code jobs
+# Execute streaming and batch pipelines
 
-In the dockerfile you only need to comment and uncomment the ENTRYPOINT.
+## Streaming processing
 
-It is not necessary to comment the COPY code, they can all be uncommented.
+### Create topics
+In the cronjob-shell-tools shell:
 
+Create client.properties
+```
+security.protocol=SASL_PLAINTEXT
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="user1" password="XXXXX";
+```
+Create topics
+```
+KAFKA_OPTS="-Djava.security.auth.login.config=jaas.conf" kafka-topics --create --topic estat_estacions --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1
+KAFKA_OPTS="-Djava.security.auth.login.config=jaas.conf" kafka-topics --create --topic truck-route --bootstrap-server kafka:9092 --partitions 3 --replication-factor 1
+```
 
-Then execute **from the pyspark folder**: 
+### Create the cronjobs for each of the processes
+To run the streaming pipeline, the cronjobs of each of the following processes must be executed:
 
-````
-./build-pyspark.sh
-````
+- 1_data_ingestion
+- 2_stations_clustering
+- 3_update_Stations_status
+- 4_optimal_route
 
-## Streaming-job
-Subscribes to the topic *my-topic* and connects to mongodb, to the current test collection to save the key and the value that it receives
+In each folder, run:
+```
+./build.sh
+```
+With this, the dockerfile and the cronjob are executed simultaneously.
 
+Once the cronjobs are created, if the cronjob configuration is `suspend = false`, a trigger will be made automatically in k9s. 
+
+Otherwise, if `suspend = true` a manual trigger will have to be done on the k9s
 
 ## Batch processing
 
@@ -157,11 +178,57 @@ To execute the expansion strategy analysis you just need to run the cronjobs of 
 - Visualization
 
 For each zone you should build & run the docker image with the shown command. 
-As an example for the landing zone: 
+As an example for the landing zone:
+```
 ./build_expansion_landing.sh
 kubectl apply -f cronjob-expnsion-landing.yaml
-
+```
 Once created the cronjob you have to trigger it using k9s. The cronjob will automatically execute the code. 
 
 The visualization part expose a streamlit app on the port 8501 so you should expose the pod containing it directly in k9s and visit the app on localhost:8501.
+
+# Metrics
+
+In manifests folder:
+```
+kubectl applt -f prometheus.yaml
+kubectl applt -f prometheus-ConfigMap.yaml
+kubectl applt -f prometheus-service.yaml
+kubectl applt -f pushgateway.yaml
+kubectl applt -f install-grafana.yaml
+```
+
+In 3_update_stations_status folder of streaming pipeline:
+```
+kubectl apply -f metrics_service.yaml
+```
+If you want to see the metrics collected by **Prometheus**:
+
+On k9s, run a prometheus services port-forward on port 9090.
+
+Open in browser:
+```
+http://localhost:9090
+```
+
+If you want to see the metrics in **Grafana**:
+
+On k9s, run a grafana services port-forward on port 3000.
+
+Open in browser:
+```
+http://localhost:3000/
+```
+In the Grafana data source configuration, indicate that the data comes from the service:
+```
+http://prometheus-service:9090
+```
+
+If you want to see the **Kafka** metrics collected by **JMX Exporter**:
+
+```
+kubectl port-forward svc/kafka-jmx-metrics 5556:5556
+```
+
+
 
