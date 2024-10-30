@@ -231,7 +231,7 @@ def main():
             min_distance, optimal_route = find_optimal_route_fixed_start(neo4j_conn, start_station, remaining_stations)
 
             print(f"Truck {truck} - Optimal Distance: {min_distance} - Optimal Path: {optimal_route}")
-            send_to_kafka(truck, optimal_route)
+            send_to_kafka(truck, optimal_route, min_distance)
 
     finally:
         neo4j_conn.query(drop_graph_query)

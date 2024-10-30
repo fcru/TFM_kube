@@ -3,7 +3,6 @@ import pandas as pd
 import json
 from confluent_kafka import Consumer, KafkaError
 import pydeck as pdk
-import random
 import time
 
 # Configuración del consumidor Kafka
@@ -19,6 +18,17 @@ conf = {
 
 consumer = Consumer(conf)
 consumer.subscribe(['truck-route'])
+
+# Colores asignados a los camiones
+camion_colores = {
+    i: color for i, color in enumerate([
+        [255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 0], [255, 165, 0], [128, 0, 128],
+        [0, 255, 255], [255, 192, 203], [255, 20, 147], [75, 0, 130], [139, 69, 19], [0, 100, 0],
+        [173, 255, 47], [255, 69, 0], [0, 0, 128], [186, 85, 211], [47, 79, 79], [154, 205, 50],
+        [255, 140, 0], [70, 130, 180], [72, 61, 139], [100, 149, 237], [255, 105, 180],
+        [0, 191, 255], [34, 139, 34]
+    ])
+}
 
 # Función para obtener mensajes de Kafka
 def consumir_mensajes():
@@ -38,35 +48,29 @@ def consumir_mensajes():
             mensajes.append(msg.value().decode('utf-8'))
     return mensajes
 
-# Generar un color aleatorio
-def generar_color_aleatorio():
-    return [random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)]
-
-# Función para procesar los mensajes y extraer las coordenadas
+# Función para procesar los mensajes y extraer datos
 def procesar_rutas(mensajes):
     data = []
     lineas = []
-    colores = {}
+    camion_info = {}
     for mensaje in mensajes:
         try:
             # Decodificar el mensaje JSON
             mensaje_decodificado = json.loads(mensaje)
             truck_id = mensaje_decodificado["truck_id"]
+            distancia_optima = mensaje_decodificado.get("distance", 0)
 
-            # Generar un color único para cada camión
-            if truck_id not in colores:
-                colores[truck_id] = generar_color_aleatorio()
-
-            color_truck = colores[truck_id]
+            # Obtener el color del camión
+            color_truck = camion_colores.get(truck_id, [255, 255, 255])
 
             # Acceder a la lista de estaciones dentro de "optimal_route"
             estaciones = mensaje_decodificado.get("optimal_route", [])
             coordenadas_ruta = []
 
+            # Extraer datos para cada estación
             for idx, estacion in enumerate(estaciones):
                 lat = estacion["lat"]
                 lon = estacion["lon"]
-                # Añadir cada estación con su color correspondiente
                 data.append({
                     "lat": lat,
                     "lon": lon,
@@ -84,24 +88,31 @@ def procesar_rutas(mensajes):
             if len(coordenadas_ruta) > 1:
                 lineas.append({"path": coordenadas_ruta, "color": color_truck})
 
+            # Agregar información a la tabla de camiones
+            camion_info[truck_id] = {
+                "ID Camión": truck_id,
+                "Color": color_truck,
+                "Distancia Óptima (metros)": f"{distancia_optima:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            }
+
         except json.JSONDecodeError:
             st.error("Error de decodificación JSON: " + mensaje)
         except KeyError as e:
             st.error(f"Error: clave faltante {str(e)} en el mensaje: {mensaje}")
-    return pd.DataFrame(data), lineas
+    return pd.DataFrame(data), lineas, camion_info
 
 # Interfaz de Streamlit
 st.title("Visualización de rutas óptimas para reabastecimiento de bicicletas")
-
 st.subheader("Rutas recibidas desde Kafka:")
 
-placeholder = st.empty()  # Contenedor para la visualización dinámica
+map_placeholder = st.empty()  # Contenedor para la visualización dinámica del mapa
+table_placeholder = st.empty()  # Contenedor para la tabla dinámica de camiones
 
 while True:
     rutas = consumir_mensajes()
 
     if rutas:
-        df_rutas, rutas_lineas = procesar_rutas(rutas)
+        df_rutas, rutas_lineas, camion_info = procesar_rutas(rutas)
 
         # Configurar pydeck con los datos y las líneas
         if not df_rutas.empty:
@@ -134,7 +145,7 @@ while True:
             )
 
             # Crear el mapa con pydeck, incluyendo tooltip
-            placeholder.pydeck_chart(pdk.Deck(
+            map_placeholder.pydeck_chart(pdk.Deck(
                 map_style='mapbox://styles/mapbox/light-v9',
                 initial_view_state=vista_inicial,
                 layers=[layer_puntos, layer_lineas],
@@ -143,10 +154,19 @@ while True:
                     "style": {"backgroundColor": "steelblue", "color": "white"}
                 }
             ))
+
+            # Crear y actualizar la tabla de información de los camiones
+            df_camiones = pd.DataFrame.from_dict(camion_info, orient="index").reset_index(drop=True)
+            # Modificar la columna 'Color' para que sea una celda HTML con el color de fondo
+            df_camiones['Color'] = df_camiones['Color'].apply(
+                lambda rgb: f'<div style="background-color: rgb({rgb[0]}, {rgb[1]}, {rgb[2]}); '
+                            f'width: 40px; height: 20px; border-radius: 5px;"></div>'
+            )
+            # Mostrar la tabla usando HTML para incluir las celdas de color
+            table_placeholder.write(df_camiones.to_html(escape=False, index=False), unsafe_allow_html=True)
     else:
         st.write("No se han recibido rutas nuevas.")
 
     # Espera 10 segundos antes de volver a consultar Kafka
-    time.sleep(20)
-
+    time.sleep(10)
 
