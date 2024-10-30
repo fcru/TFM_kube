@@ -59,6 +59,7 @@ def procesar_rutas(mensajes):
             mensaje_decodificado = json.loads(mensaje)
             truck_id = mensaje_decodificado["truck_id"]
             distancia_optima = mensaje_decodificado.get("distance", 0)
+            balance_bicicletas = mensaje_decodificado.get("balance_bicicletas", 0)
 
             # Obtener el color del camión
             color_truck = camion_colores.get(truck_id, [255, 255, 255])
@@ -92,7 +93,8 @@ def procesar_rutas(mensajes):
             camion_info[truck_id] = {
                 "ID Camión": truck_id,
                 "Color": color_truck,
-                "Distancia Óptima (metros)": f"{distancia_optima:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                "Distancia Óptima (metros)": f"{distancia_optima:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                "Balance Bicicletas": balance_bicicletas
             }
 
         except json.JSONDecodeError:
@@ -102,11 +104,11 @@ def procesar_rutas(mensajes):
     return pd.DataFrame(data), lineas, camion_info
 
 # Interfaz de Streamlit
-st.title("Visualización de rutas óptimas para reabastecimiento de bicicletas")
+st.title("Rutas óptimas para reabastecimiento de bicicletas")
 st.subheader("Rutas recibidas desde Kafka:")
 
-map_placeholder = st.empty()  # Contenedor para la visualización dinámica del mapa
-table_placeholder = st.empty()  # Contenedor para la tabla dinámica de camiones
+map_placeholder = st.empty()
+table_placeholder = st.empty()
 
 while True:
     rutas = consumir_mensajes()
@@ -122,7 +124,7 @@ while True:
                 data=df_rutas,
                 get_position='[lon, lat]',
                 get_radius=90,
-                get_color='color',  # Asignar color único para cada camión
+                get_color='color',
                 pickable=True
             )
 
@@ -132,7 +134,7 @@ while True:
                 data=rutas_lineas,
                 get_path="path",
                 get_width=5,
-                get_color="color",  # Asignar color único para cada camión
+                get_color="color",
                 width_min_pixels=3,
             )
 
