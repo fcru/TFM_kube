@@ -76,6 +76,87 @@ def filter_estacio_to_gdf(df_to_filter):
     except Exception as e:
         return None, f"Error processing estacio: {str(e)}"
 
+def doc_to_csv(collection_name, limit=None, fields=None):
+    try:
+        client = MongoClient("mongodb://mongodb:27017")
+        db = client['bicing_db']
+        collection = db[collection_name]
+
+        # Use projection to limit fields if specified
+        projection = {field: 1 for field in fields} if fields else None
+
+        # Use limit to reduce the number of documents
+        if limit:
+            data = list(collection.find({}, projection).limit(limit))
+        else:
+            data = list(collection.find({}, projection))
+
+        if not data:
+            return None, f"No data found in collection {collection_name}"
+        data = [clean_document(doc) for doc in data]
+
+        df = pd.DataFrame(data)
+
+        df.to_csv(f'tmp/{collection_name}.csv')
+        return df,None
+
+    except Exception as e:
+        return None, f"Error processing {collection_name}: {str(e)}"
+
+def filter_estacio_to_csv(df_to_filter):
+    client = MongoClient("mongodb://mongodb:27017")
+    db = client['bicing_db']
+    collection = db['estacio']
+    try:
+        station_ids_to_exclude = df_to_filter['station_id'].tolist()
+
+        pipeline = [
+            # Match stage to filter out the station_ids present in the other DataFrame
+            {"$match": {
+                "station_id": {"$nin": station_ids_to_exclude}
+            }},
+            # Group by station_id and get the first document for each group
+            {"$group": {
+                "_id": "$station_id",
+                "first_doc": {"$first": "$$ROOT"}
+            }},
+            # Replace the root with the first document
+            {"$replaceRoot": {"newRoot": "$first_doc"}}
+        ]
+
+        # Execute the aggregation
+        data = list(collection.aggregate(pipeline))
+
+        df = pd.DataFrame(data)
+        df.to_csv(f'tmp/estacio_filtered.csv')
+        return df,None
+    except Exception as e:
+        return None, f"Error processing estacio: {str(e)}"
+
+
+def csv_to_gdf(collection_name, limit=None, fields=None):
+    try:
+
+        df = pd.read_csv(f'tmp/{collection_name}.csv')
+
+        # Convert geometry
+        if 'geometry' in df.columns:
+            df['geometry'] = df['geometry'].apply(safe_shape)
+        elif 'coordinates' in df.columns:
+            df['geometry'] = df['coordinates'].apply(
+                lambda x: Point(x) if isinstance(x, list) and len(x) == 2 else None)
+        else:
+            return None, f"No geometry or coordinates found in collection {collection_name}"
+
+        gdf = gpd.GeoDataFrame(df, geometry='geometry').dropna(subset=['geometry'])
+        if len(gdf) == 0:
+            return None, f"No valid geometries found in collection {collection_name}"
+
+        gdf.set_crs(epsg=4326, inplace=True)
+        return gdf, None
+    except Exception as e:
+        return None, f"Error processing {collection_name}: {str(e)}"
+
 def doc_to_gdf(collection_name, limit=None, fields=None):
     try:
         client = MongoClient("mongodb://mongodb:27017")
@@ -114,5 +195,3 @@ def doc_to_gdf(collection_name, limit=None, fields=None):
         return gdf, None
     except Exception as e:
         return None, f"Error processing {collection_name}: {str(e)}"
-
-
