@@ -1,23 +1,8 @@
 import streamlit as st
 import pandas as pd
 import json
-from confluent_kafka import Consumer, KafkaError
 import pydeck as pdk
 import time
-
-# Configuración del consumidor Kafka
-conf = {
-    'bootstrap.servers': "kafka:9092",
-    'group.id': "streamlit-group-" + str(hash(st)),  # Grupo único
-    'auto.offset.reset': 'latest',
-    'security.protocol': 'SASL_PLAINTEXT',
-    'sasl.mechanism': 'PLAIN',
-    'sasl.username': 'user1',
-    'sasl.password': 'LtG5496WgU'
-}
-
-consumer = Consumer(conf)
-consumer.subscribe(['truck-route'])
 
 # Colores asignados a los camiones
 camion_colores = {
@@ -30,47 +15,22 @@ camion_colores = {
     ])
 }
 
-# Función para obtener mensajes de Kafka
-def consumir_mensajes():
-    mensajes = []
-    timeout = 20.0
-    while True:
-        msg = consumer.poll(timeout)
-        if msg is None:
-            break
-        if msg.error():
-            if msg.error().code() == KafkaError._PARTITION_EOF:
-                continue
-            else:
-                st.error(f"Error de Kafka: {msg.error()}")
-                break
-        else:
-            mensaje = msg.value().decode('utf-8')
-            print(f"Mensaje recibido de Kafka: {mensaje}")
-            mensajes.append(mensaje)
-    return mensajes
-
-# Función para procesar los mensajes y extraer datos
+# Función para procesar un bloque de rutas
 def procesar_rutas(mensajes):
     data = []
     lineas = []
     camion_info = {}
     for mensaje in mensajes:
         try:
-            # Decodificar el mensaje JSON
-            mensaje_decodificado = json.loads(mensaje)
-            truck_id = mensaje_decodificado["truck_id"]
-            distancia_optima = mensaje_decodificado.get("distance", 0)
-            balance_bicicletas = mensaje_decodificado.get("balance_bicicletas", 0)
-
-            # Obtener el color del camión
+            # Obtener datos del mensaje JSON
+            truck_id = mensaje["truck_id"]
+            distancia_optima = mensaje.get("distance", 0)
+            balance_bicicletas = mensaje.get("balance_bicicletas", 0)
             color_truck = camion_colores.get(truck_id, [255, 255, 255])
-
-            # Acceder a la lista de estaciones dentro de "optimal_route"
-            estaciones = mensaje_decodificado.get("optimal_route", [])
+            estaciones = mensaje.get("optimal_route", [])
             coordenadas_ruta = []
 
-            # Extraer datos para cada estación
+            # Extraer datos de cada estación
             for idx, estacion in enumerate(estaciones):
                 lat = estacion["lat"]
                 lon = estacion["lon"]
@@ -87,7 +47,7 @@ def procesar_rutas(mensajes):
                 })
                 coordenadas_ruta.append([lon, lat])
 
-            # Añadir las coordenadas como una línea
+            # Añadir línea de coordenadas
             if len(coordenadas_ruta) > 1:
                 lineas.append({"path": coordenadas_ruta, "color": color_truck})
 
@@ -96,27 +56,36 @@ def procesar_rutas(mensajes):
                 "ID Camión": truck_id,
                 "Color": color_truck,
                 "Distancia Óptima (metros)": f"{distancia_optima:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-                "Balance Bicicletas": balance_bicicletas
+                "Bicicletas a Reponer": balance_bicicletas
             }
 
-        except json.JSONDecodeError:
-            st.error("Error de decodificación JSON: " + mensaje)
         except KeyError as e:
-            st.error(f"Error: clave faltante {str(e)} en el mensaje: {mensaje}")
+            st.error(f"Error: clave faltante {str(e)} en el mensaje")
     return pd.DataFrame(data), lineas, camion_info
 
 # Interfaz de Streamlit
 st.title("Rutas óptimas para reabastecimiento de bicicletas")
-st.subheader("Rutas recibidas desde Kafka:")
 
 map_placeholder = st.empty()
 table_placeholder = st.empty()
 
-while True:
-    rutas = consumir_mensajes()
+# Repetir el proceso 10 veces
+for _ in range(10):
+    # Cargar los datos desde el archivo JSON
+    try:
+        with open('optimal_route.json', 'r') as f:
+            rutas_totales = json.load(f)
+    except FileNotFoundError:
+        st.error("Archivo 'optimal_route.json' no encontrado.")
+        rutas_totales = []
 
-    if rutas:
-        df_rutas, rutas_lineas, camion_info = procesar_rutas(rutas)
+    # Iterar sobre bloques de rutas en el JSON con una pausa de 5 segundos
+    for bloque_rutas in rutas_totales:
+        if not bloque_rutas:
+            st.write("No se han encontrado rutas nuevas en el bloque.")
+            continue
+
+        df_rutas, rutas_lineas, camion_info = procesar_rutas(bloque_rutas)
 
         # Configurar pydeck con los datos y las líneas
         if not df_rutas.empty:
@@ -161,16 +130,17 @@ while True:
 
             # Crear y actualizar la tabla de información de los camiones
             df_camiones = pd.DataFrame.from_dict(camion_info, orient="index").reset_index(drop=True)
-            # Modificar la columna 'Color' para que sea una celda HTML con el color de fondo
             df_camiones['Color'] = df_camiones['Color'].apply(
                 lambda rgb: f'<div style="background-color: rgb({rgb[0]}, {rgb[1]}, {rgb[2]}); '
                             f'width: 40px; height: 20px; border-radius: 5px;"></div>'
             )
             # Mostrar la tabla usando HTML para incluir las celdas de color
             table_placeholder.write(df_camiones.to_html(escape=False, index=False), unsafe_allow_html=True)
-    else:
-        st.write("No se han recibido rutas nuevas.")
+        else:
+            st.write("No hay rutas en este bloque para visualizar.")
 
-    # Espera 10 segundos antes de volver a consultar Kafka
-    time.sleep(10)
+        # Pausa de 5 segundos antes de procesar el siguiente bloque
+        time.sleep(5)
 
+    # Espera 5 segundos antes de volver a procesar todos los bloques del JSON
+    time.sleep(5)

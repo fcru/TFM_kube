@@ -8,11 +8,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the app code
-COPY streaming-app.py .
+# Copy the app code and JSON file
+COPY streaming-app-standalone.py .
+COPY optimal_route.json .
 
 # Expose the Streamlit port
 EXPOSE 8501
 
 # Run the Streamlit app
-CMD ["streamlit", "run", "streaming-app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "streaming-app-standalone.py", "--server.port=8501", "--server.address=0.0.0.0"]
