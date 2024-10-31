@@ -23,20 +23,17 @@ def get_mapa_bcn():
 
     return bcn_map
 
-def get_tooltip_eficiencia(row):
+def get_tooltip(row, type):
+    if type == 'demanda':
+        tasa = f"<b>Demanda total</b>: {row['rotacion']:.2f}"
+    elif type == 'eficiencia':
+        tasa = f"<b>Eficiencia</b>: {row['tasa_eficiencia_ajustada']:.2f}"
+
     text = "<span style='font-family:Arial;'> " +\
             f"<b>ID estación</b>: {row['station_id']}<br>" +\
             f"<b>Nombre</b>: {capitalizar_nombre(row['name'])}<br>" +\
-            f"<b>Eficiencia</b>: {row['tasa_eficiencia_ajustada']:.2f} </span>"
+            f"{tasa} </span>"
     return text
-
-def get_tooltip_demanda(row):
-    text = "<span style='font-family:Arial;'> " +\
-            f"<b>ID estación</b>: {row['station_id']}<br>" +\
-            f"<b>Nombre</b>: {capitalizar_nombre(row['name'])}<br>" +\
-            f"<b>Demanda total</b>: {row['rotacion']:.2f} </span>"
-    return text
-
 
 def crear_grafico_comparativo(real_data, pred_data, type):
     if type == 'taken':
@@ -118,23 +115,37 @@ def get_popup_demanda(row, df):
     popup_form = folium.Popup(iframe)  
     return popup_form
 
-def get_filtered_data(df):
-    # Crea un control deslizante de tiempo
+
+def config_filters(df):
     min_fecha = df['fecha'].min()
     max_fecha = df['fecha'].max()
-    start_date = datetime(min_fecha.year, min_fecha.month, min_fecha.day, 0)
-    end_date = datetime(max_fecha.year, max_fecha.month, max_fecha.day, 23)
 
-    fecha_inicio, fecha_fin  = st.sidebar.slider(
-        "Selecciona un rango de fechas",
+    start_date = datetime(min_fecha.year, min_fecha.month, min_fecha.day)
+    end_date = datetime(max_fecha.year, max_fecha.month, max_fecha.day)
+
+    fecha_inicio, fecha_fin = st.sidebar.slider(
+        "Seleccione un rango de fechas",
         min_value=start_date,
         max_value=end_date,
         value=(start_date, end_date),
-        step=timedelta(hours=1)
+        step=timedelta(days=1)
     )
 
-    fecha_inicio_str = fecha_inicio.strftime('%d %b %Y, %I:%M%p')
-    fecha_fin_str = fecha_fin.strftime('%d %b %Y, %I:%M%p')
+    hour_ini, hour_fin = st.sidebar.select_slider(
+        "Seleccione un rango de horas",
+        options=['00:00','01:00','02:00','03:00','04:00','05:00','06:00','07:00','08:00',
+                 '09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00',
+                 '18:00','19:00','20:00','21:00','22:00','23:00'],
+        value=('00:00','23:00')
+    )
+
+    hora_inicio = datetime.strptime(hour_ini, '%H:%M').time()
+    hora_fin = datetime.strptime(hour_fin, '%H:%M').time()
+    fecha_inicio = datetime.combine(fecha_inicio.date(), hora_inicio)
+    fecha_fin = datetime.combine(fecha_fin.date(), hora_fin)
+
+    fecha_inicio_str = fecha_inicio.strftime('%d %b %Y, %H:%M') + ' h'
+    fecha_fin_str = fecha_fin.strftime('%d %b %Y, %H:%M') + ' h'
 
     st.sidebar.info('Inicio: **%s**  \nFin: **%s**' % (fecha_inicio_str,fecha_fin_str))
 
@@ -168,7 +179,8 @@ def main():
         estado_bicing['rotacion'] = estado_bicing['total_bikes_taken'] + estado_bicing['total_bikes_returned']
         estado_bicing['fecha'] = pd.to_datetime(estado_bicing['fecha']).dt.tz_localize(None)
         
-        df_filtrado = get_filtered_data(estado_bicing)
+        df_filtrado = config_filters(estado_bicing)
+        #df_filtrado = get_filtered_data(estado_bicing)
 
     tab_demanda, tab_eficiencia = st.tabs(["Predicción demanda", "Eficiencia estaciones"])
 
@@ -188,7 +200,7 @@ def main():
             folium.Marker(
                 location=(row['lat'], row['lon']),
                 icon=icon_pointer,
-                tooltip=get_tooltip_demanda(row),
+                tooltip=get_tooltip(row, 'demanda'),
                 popup=get_popup_demanda(row, estado_bicing),
                 lazy=True
             ).add_to(marker_cluster)
@@ -214,7 +226,7 @@ def main():
             folium.Marker(
                 location=(row['lat'], row['lon']),
                 icon=icon_pointer,
-                tooltip=get_tooltip_eficiencia(row)
+                tooltip=get_tooltip(row, 'eficiencia')
             ).add_to(map_ef)
 
         st.subheader("Clasificación de las estaciones según su eficiencia", divider=True)
