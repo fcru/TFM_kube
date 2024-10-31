@@ -112,18 +112,24 @@ def find_optimal_route_fixed_start(neo4j_conn, start_station, station_list):
     stations = [start_station] + station_list
     n = len(stations)
 
-    # Create a distance matrix
+    # Crear matriz de distancias
     distances = [[0] * n for _ in range(n)]
     for i in range(n):
-        for j in range(i+1, n):
+        for j in range(i + 1, n):
             cost, _ = calculate_shortest_path(neo4j_conn, stations[i]['station_id'], stations[j]['station_id'])
             distances[i][j] = distances[j][i] = cost
 
-    # Implement the nearest neighbor algorithm
-    unvisited = set(range(1, n))  # Exclude the starting station
-    current = 0  # Index of the starting station
+    unvisited = set(range(1, n))  # Excluye la estación inicial
+    current = 0  # Índice de la estación inicial
     path = [current]
     total_distance = 0
+    balance_bicicletas = 0  # Inicia el balance
+
+    # Incluir la estación inicial en el balance
+    if stations[current]['check_status'] == 'low':
+        balance_bicicletas += stations[current].get('bikes_to_refill', 0)
+    elif stations[current]['check_status'] == 'full':
+        balance_bicicletas -= stations[current].get('bikes_to_remove', 0)
 
     while unvisited:
         next_station = min(unvisited, key=lambda x: distances[current][x])
@@ -132,11 +138,17 @@ def find_optimal_route_fixed_start(neo4j_conn, start_station, station_list):
         total_distance += distances[current][next_station]
         current = next_station
 
-    # Return to the starting station
+        # Calcular balance para la estación actual
+        if stations[current]['check_status'] == 'low':
+            balance_bicicletas += stations[current].get('bikes_to_refill', 0)
+        elif stations[current]['check_status'] == 'full':
+            balance_bicicletas -= stations[current].get('bikes_to_remove', 0)
+
+    # Regresar a la estación inicial
     path.append(0)
     total_distance += distances[current][0]
 
-    # Convert indices back to station IDs
+    # Convertir índices en IDs de estación
     optimal_path = [
         {
             "station_id": stations[i]['station_id'],
@@ -145,11 +157,14 @@ def find_optimal_route_fixed_start(neo4j_conn, start_station, station_list):
             "capacity": stations[i]['capacity'],
             "check_status": stations[i]['check_status'],
             "num_bikes_available": stations[i]['num_bikes_available'],
+            "bikes_to_refill": stations[i].get('bikes_to_refill', 0),
+            "bikes_to_remove": stations[i].get('bikes_to_remove', 0),
             "truck": stations[i]['truck']
         }
         for i in path
     ]
-    return total_distance, optimal_path
+
+    return total_distance, optimal_path, balance_bicicletas
 
 # Function to get stations connected by the TO_INTERVENT relationship for a specific truck
 def get_stations_for_truck(neo4j_conn, truck_id):
@@ -157,13 +172,15 @@ def get_stations_for_truck(neo4j_conn, truck_id):
     MATCH (s:Station)-[:TO_INTERVENT]-(t:Station)
     WHERE s.truck = $truck_id OR t.truck = $truck_id
     RETURN DISTINCT
-            s.station_id AS station_id,
-            s.lat AS lat,
-            s.lon AS lon,
-            s.capacity AS capacity,
-            s.check_status AS check_status,
-            s.num_bikes_available AS num_bikes_available,
-            s.truck AS truck
+        s.station_id AS station_id,
+        s.lat AS lat,
+        s.lon AS lon,
+        s.capacity AS capacity,
+        s.check_status AS check_status,
+        s.num_bikes_available AS num_bikes_available,
+        s.bikes_to_refill AS bikes_to_refill,
+        s.bikes_to_remove AS bikes_to_remove,
+        s.truck AS truck
     """
     result = neo4j_conn.query(query, parameters={"truck_id": truck_id})
     return [
@@ -174,6 +191,8 @@ def get_stations_for_truck(neo4j_conn, truck_id):
             "capacity": record['capacity'],
             "check_status": record['check_status'],
             "num_bikes_available": record['num_bikes_available'],
+            "bikes_to_refill": record.get('bikes_to_refill', 0),
+            "bikes_to_remove": record.get('bikes_to_remove', 0),
             "truck": record['truck']
         }
         for record in result
@@ -185,7 +204,7 @@ def get_trucks(neo4j_conn):
     return [record["truck"] for record in result]
 
 # Send paths to Kafka with distance
-def send_to_kafka(truck, optimal_route, distance):
+def send_to_kafka(truck, optimal_route, distance, balance_bicicletas):
     message = {
         "truck_id": truck,
         "optimal_route": [
@@ -196,18 +215,21 @@ def send_to_kafka(truck, optimal_route, distance):
                 "capacity": station['capacity'],
                 "check_status": station['check_status'],
                 "num_bikes_available": station['num_bikes_available'],
+                "bikes_to_refill": station.get('bikes_to_refill', 0),
+                "bikes_to_remove": station.get('bikes_to_remove', 0),
                 "truck": station['truck']
             } for station in optimal_route
         ],
-        "distance": distance
+        "distance": distance,
+        "balance_bicicletas": balance_bicicletas
     }
     producer.send(topic="truck-route", key=truck, value=message)
     producer.flush()
 
 # Main logic
 def main():
-    # Connect to Neo4j
-    neo4j_conn = Neo4jConnection(uri, "", "")
+    # Conectar a Neo4j
+    neo4j_conn = Neo4jConnection(uri, "user", "password")
 
     try:
         neo4j_conn.query(delete_query)
@@ -217,21 +239,23 @@ def main():
         trucks = get_trucks(neo4j_conn)
         trucks.sort()
 
-        # Calculate the optimal route for each truck
+        # Calcular la ruta óptima para cada camión
         for truck in trucks:
             station_list = get_stations_for_truck(neo4j_conn, truck)
 
             if not station_list:
-                print(f"No stations found for truck {truck}")
+                print(f"No se encontraron estaciones para el camión {truck}")
                 continue
 
             start_station = station_list[0]
             remaining_stations = station_list[1:]
 
-            min_distance, optimal_route = find_optimal_route_fixed_start(neo4j_conn, start_station, remaining_stations)
+            min_distance, optimal_route, balance_bicicletas = find_optimal_route_fixed_start(
+                neo4j_conn, start_station, remaining_stations
+            )
 
-            print(f"Truck {truck} - Optimal Distance: {min_distance} - Optimal Path: {optimal_route}")
-            send_to_kafka(truck, optimal_route)
+            print(f"Camión {truck} - Distancia Óptima: {min_distance} - Balance Bicicletas: {balance_bicicletas}")
+            send_to_kafka(truck, optimal_route, min_distance, balance_bicicletas)
 
     finally:
         neo4j_conn.query(drop_graph_query)
