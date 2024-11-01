@@ -140,7 +140,7 @@ for _ in range(10):
             st.write("No hay rutas en este bloque para visualizar.")
 
         # Pausa de 5 segundos antes de procesar el siguiente bloque
-        time.sleep(5)
+        time.sleep(3)
 
     # Espera 5 segundos antes de volver a procesar todos los bloques del JSON
-    time.sleep(5)
+    time.sleep(2)
