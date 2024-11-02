@@ -16,8 +16,8 @@ def get_mapa_bcn():
 
     folium.plugins.Fullscreen(
         position="topright",
-        title="Pantalla completa",
-        title_cancel="Salir",
+        title="Full Screen",
+        title_cancel="Exit",
         force_separate_button=True,
     ).add_to(bcn_map)
 
@@ -25,23 +25,23 @@ def get_mapa_bcn():
 
 def get_tooltip(row, type):
     if type == 'demanda':
-        tasa = f"<b>Demanda total</b>: {row['rotacion']:.2f}"
+        tasa = f"<b>Total Demand</b>: {row['rotacion']:.2f}"
     elif type == 'eficiencia':
-        tasa = f"<b>Eficiencia</b>: {row['tasa_eficiencia_ajustada']:.2f}"
+        tasa = f"<b>Efficiency</b>: {row['tasa_eficiencia_ajustada']:.2f}"
 
     text = "<span style='font-family:Arial;'> " +\
-            f"<b>ID estación</b>: {row['station_id']}<br>" +\
-            f"<b>Nombre</b>: {capitalizar_nombre(row['name'])}<br>" +\
+            f"<b>Station ID</b>: {row['station_id']}<br>" +\
+            f"<b>Name</b>: {capitalizar_nombre(row['name'])}<br>" +\
             f"{tasa} </span>"
     return text
 
 def crear_grafico_comparativo(real_data, pred_data, type):
     if type == 'taken':
         real_bikes = real_data['total_bikes_taken']
-        title = "Total bicicletas tomadas"
+        title = "Total bicycles taken"
     elif type == 'returned':
         real_bikes = real_data['total_bikes_returned']
-        title = "Total bicicletas devueltas"
+        title = "Total bicycles returned"
 
     df_real = pd.DataFrame({
         'hora': real_data['fecha'],
@@ -64,16 +64,16 @@ def crear_grafico_comparativo(real_data, pred_data, type):
     df_comparativo = pd.concat([df_real, df_pred], ignore_index=True)
 
     lineas = alt.Chart(df_comparativo).mark_line().encode(
-        alt.X('hora:T').title('Hora'),
-        alt.Y('bikes:Q').title('Demanda total'),
+        alt.X('hora:T').title('Hour'),
+        alt.Y('bikes:Q').title('Total Demand'),
         alt.Color('type:N')
     ).properties(
         title = title
     )
 
     area = alt.Chart(df_interval).mark_area(opacity=0.2, color='#606ff1').encode(
-        alt.X('hora:T').title('Hora'),
-        alt.Y('up:Q').title('Intervalo superior'),
+        alt.X('hora:T').title('Hour'),
+        alt.Y('up:Q').title('Upper Interval'),
         alt.Y2('low:Q')
     )
 
@@ -91,7 +91,7 @@ def get_popup_demanda(row, df):
     filename_taken = f"data/predicts/taken/{row['station_id']}_prediccion_taken.csv"
     filename_returned = f"data/predicts/returned/{row['station_id']}_prediccion_returned.csv"
 
-    chart_concat_html = "<p>Predicción de la demanda no disponible</p>"
+    chart_concat_html = "<p>Demand forecasting not available</p>"
     if os.path.exists(filename_taken) & os.path.exists(filename_returned):
         df_pred_taken = read_csv_file(filename_taken)
         df_pred_returned = read_csv_file(filename_returned)
@@ -104,9 +104,9 @@ def get_popup_demanda(row, df):
 
     popup_text = f"""
                 <span style='font-family:Arial;'>
-                <h3>Estación: {row['station_id']} - {row['name']}</h3>
-                <h4>Nivel de rotación: {row['rotacion']:.2f}</h4>
-                <h4>Predicción de la demanda vs Realidad a 30/09/2024</h4>
+                <h3>Station: {row['station_id']} - {row['name']}</h3>
+                <h4>Rotation Level: {row['rotacion']:.2f}</h4>
+                <h4>Demand forecast vs Reality as of 30/09/2024</h4>
                 {chart_concat_html}
                 </span>
                 """
@@ -124,7 +124,7 @@ def config_filters(df):
     end_date = datetime(max_fecha.year, max_fecha.month, max_fecha.day)
 
     fecha_inicio, fecha_fin = st.sidebar.slider(
-        "Seleccione un rango de fechas",
+        "Select a date range",
         min_value=start_date,
         max_value=end_date,
         value=(start_date, end_date),
@@ -132,7 +132,7 @@ def config_filters(df):
     )
 
     hour_ini, hour_fin = st.sidebar.select_slider(
-        "Seleccione un rango de horas",
+        "Select a time range",
         options=['00:00','01:00','02:00','03:00','04:00','05:00','06:00','07:00','08:00',
                  '09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00',
                  '18:00','19:00','20:00','21:00','22:00','23:00'],
@@ -147,7 +147,7 @@ def config_filters(df):
     fecha_inicio_str = fecha_inicio.strftime('%d %b %Y, %H:%M') + ' h'
     fecha_fin_str = fecha_fin.strftime('%d %b %Y, %H:%M') + ' h'
 
-    st.sidebar.info('Inicio: **%s**  \nFin: **%s**' % (fecha_inicio_str,fecha_fin_str))
+    st.sidebar.info('Start: **%s**  \nEnd: **%s**' % (fecha_inicio_str,fecha_fin_str))
 
     df_filtrado = df[(df['fecha'] >= fecha_inicio) & (df['fecha'] <= fecha_fin)]
 
@@ -161,7 +161,7 @@ def main():
         initial_sidebar_state="auto"
     )
     
-    with st.spinner("Creando la visualización. Por favor, espere..."):
+    with st.spinner("Creating visualization. Please wait..."):
         # Cargar datos de estaciones
         info_estaciones = read_csv_file("data/info_estaciones.csv")
 
@@ -182,7 +182,7 @@ def main():
         df_filtrado = config_filters(estado_bicing)
         #df_filtrado = get_filtered_data(estado_bicing)
 
-    tab_demanda, tab_eficiencia = st.tabs(["Predicción demanda", "Eficiencia estaciones"])
+    tab_demanda, tab_eficiencia = st.tabs(["Demand Forecasting", "Station Efficiency"])
 
     with tab_demanda:
         demanda_total = df_filtrado.groupby('station_id')['rotacion'].mean().reset_index()
@@ -205,7 +205,7 @@ def main():
                 lazy=True
             ).add_to(marker_cluster)
 
-        st.subheader("Demanda de las estaciones", divider=True)
+        st.subheader("Station Demand", divider=True)
         figure = folium.Figure().add_child(map_dem)
         st.components.v1.html(figure.render(), width=1200,height=750)
 
@@ -229,7 +229,7 @@ def main():
                 tooltip=get_tooltip(row, 'eficiencia')
             ).add_to(map_ef)
 
-        st.subheader("Clasificación de las estaciones según su eficiencia", divider=True)
+        st.subheader("Station Classification by Efficiency Level", divider=True)
         figure = folium.Figure().add_child(map_ef)
         st.components.v1.html(figure.render(), width=1200,height=750)
         
